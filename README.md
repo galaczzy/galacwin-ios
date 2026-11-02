@@ -69,9 +69,9 @@ Because JIT needs a debugger, Madeira cannot be offered on the App Store.
 
 ## Installing
 
-There is no installable release for this fork. Its build workflow is manual and
-fails before checking out the repository until the security review is complete
-and its approval variables are set. [SECURITY.md](SECURITY.md) records the
+There is no installable release for this fork. Its build workflow is manual;
+an isolated audit build may run without publishing an IPA, while any IPA
+publication requires security approval. [SECURITY.md](SECURITY.md) records the
 remaining dependencies, binary provenance checks, signing, and device tests.
 
 ## Building from source

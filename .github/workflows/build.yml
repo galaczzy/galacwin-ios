@@ -1,9 +1,16 @@
 name: Build IPA
 
 on:
-  # This build fetches and packages executable dependencies. Run it only after
-  # reviewing their provenance. The VC redist digest is pinned in the recipe.
+  # This build fetches and packages executable dependencies. Audit mode runs
+  # without personal credentials and does not publish the IPA. The VC redist
+  # digest is pinned in the recipe.
   workflow_dispatch:
+    inputs:
+      audit_build:
+        description: 'Build for isolated CI inspection without publishing the IPA'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,9 +30,10 @@ jobs:
       - name: Require reviewed build inputs
         env:
           APPROVED: ${{ vars.SECURITY_BUILD_APPROVED }}
+          AUDIT_BUILD: ${{ inputs.audit_build }}
         run: |
-          if [ "$APPROVED" != 'true' ]; then
-            echo '::error::Build blocked: complete SECURITY.md review before setting SECURITY_BUILD_APPROVED=true'
+          if [ "$APPROVED" != 'true' ] && [ "$AUDIT_BUILD" != 'true' ]; then
+            echo '::error::IPA publication blocked: complete SECURITY.md review or select an isolated audit build'
             exit 1
           fi
 
@@ -379,10 +387,17 @@ jobs:
           merge-multiple: true
       - name: Build IPA
         run: tools/build-ipa.sh
+      - name: Record isolated build result
+        if: ${{ inputs.audit_build }}
+        run: |
+          shasum -a 256 dist/Madeira.ipa
+          unzip -t dist/Madeira.ipa | tail -n 1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ !inputs.audit_build }}
         with:
-          name: Madeira-ipa
+          name: GalacWin-ipa
           path: dist/Madeira.ipa
           if-no-files-found: error
           overwrite: true
           compression-level: 0
+          retention-days: 1

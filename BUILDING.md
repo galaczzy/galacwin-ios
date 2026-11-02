@@ -2,8 +2,9 @@
 
 > [!WARNING]
 > **GalacWin iOS has not passed its security review and has no approved IPA.**
-> This document records the inherited build process for inspection. Do not
-> run it or install its output until [SECURITY.md](SECURITY.md) is complete.
+> This document records the inherited build process for inspection. Only the
+> isolated GitHub Actions audit build in [SECURITY.md](SECURITY.md) is allowed
+> before review is complete. Do not install its output.
 
 Madeira is intended to be buildable from a clean clone with one command.
 

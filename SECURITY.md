@@ -2,9 +2,10 @@
 
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
-atribuciones. **Todavía no está aprobada para compilar, instalar ni usar con
-cuentas personales.** Una revisión de código y un resultado de antivirus no
-pueden demostrar ausencia absoluta de malware.
+atribuciones. **Sólo se permite una compilación de auditoría aislada en GitHub
+Actions, sin cuentas ni secretos personales y sin publicar el IPA. Todavía no
+está aprobada para instalar ni usar con cuentas personales.** Una revisión de
+código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
 
 ## Controles aplicados
 
@@ -27,10 +28,11 @@ pueden demostrar ausencia absoluta de malware.
   Ese archivo no se ejecutó ni se incorporó al repositorio. Sus 14 DLL AMD64
   también tienen firma válida de Microsoft y SHA-256 individuales fijados en
   `tools/build/vc-redist-x64.sha256`.
-- GitHub Actions sólo inicia la compilación manualmente y su trabajo de
-  seguridad falla antes de descargar o ejecutar el proyecto hasta que
-  `SECURITY_BUILD_APPROVED` sea `true`. Este valor debe activarse únicamente
-  después de completar la lista de controles.
+- GitHub Actions sólo inicia la compilación manualmente. `audit_build=true`
+  permite una prueba aislada en el repositorio público y suprime la publicación
+  del IPA; sin ese modo, el trabajo de seguridad exige
+  `SECURITY_BUILD_APPROVED=true`. Este valor debe activarse únicamente después
+  de completar la lista de controles.
 - Las acciones de checkout, caché y artefactos del flujo están fijadas a
   commits concretos; checkout no conserva la credencial de Git para los
   scripts posteriores.
