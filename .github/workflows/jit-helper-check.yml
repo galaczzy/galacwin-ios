@@ -1,0 +1,24 @@
+name: Check JIT helper
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Compile the iOS JIT helper without signing
+        run: >-
+          xcodebuild -project app/Madeira.xcodeproj
+          -target MadeiraJITHelper
+          -configuration Debug
+          -sdk iphoneos
+          CODE_SIGNING_ALLOWED=NO
+          build

@@ -6,6 +6,7 @@
 // One MadeiraJITRequest per extension request, answered when the request completes.
 
 import Foundation
+import CryptoKit
 import os
 #if !targetEnvironment(simulator)
 import StikJIT
@@ -43,6 +44,115 @@ private enum StikJIT {
 }
 #endif
 
+#if !targetEnvironment(simulator)
+/// StikJIT 1.9.0 accepts any nonempty cached DDI and otherwise downloads from
+/// a moving GitHub branch. Fill and verify its cache before calling it so that
+/// neither a changed download nor a modified cached file reaches the mounter.
+private enum VerifiedDDI {
+    private static let revision = "e2aaeac89ca8fa56c2fa1f144d182994e07a525b"
+
+    private struct FileSpec: Sendable {
+        let name: String
+        let path: String
+        let size: Int64
+        let sha256: String
+    }
+
+    private final class DownloadResult: @unchecked Sendable {
+        var error: Error?
+    }
+
+    static func prepare(_ paths: DDIPaths) throws {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        let cryptex = version.majorVersion > 26 || (version.majorVersion == 26 && version.minorVersion >= 4)
+        let folder = cryptex ? "Xcode_iOS_DDI_Cryptex" : "Xcode_iOS_DDI_Personalized"
+        let base = URL(string: "https://raw.githubusercontent.com/doronz88/DeveloperDiskImage/\(revision)/PersonalizedImages/\(folder)/")!
+        let files: [FileSpec]
+        if cryptex {
+            files = [
+                .init(name: "BuildManifest.plist", path: paths.manifestPath, size: 804946,
+                      sha256: "27385d7582b03b36bb3104e22b520aee0c47d72fecb4e8ecfe12ef5d966c7012"),
+                .init(name: "Image.dmg", path: paths.imagePath, size: 15895040,
+                      sha256: "873097f695a8b9734e2abc54f795a8874d40ff6fd11208ecb01ef29534c7c176"),
+                .init(name: "Image.dmg.trustcache", path: paths.trustcachePath, size: 1895,
+                      sha256: "f7f21986074eee03a215aca16ecfc78d6bf183600d8a0d2fb691f9896782e6f0"),
+                .init(name: "Image.dmg.cryptex_info", path: paths.cryptexInfoPath, size: 430,
+                      sha256: "edf49aef55aacc063d4d7be05b713bb545ce2993b3f62bcc15eccd75e610ee6c"),
+                .init(name: "Image.dmg.root_hash", path: paths.rootHashPath, size: 229,
+                      sha256: "3543fad2805b88119695c417e12679380b3b5a2742994bbcc839c8e2de5d7302"),
+            ]
+        } else {
+            files = [
+                .init(name: "BuildManifest.plist", path: paths.manifestPath, size: 801505,
+                      sha256: "8edd4a2f4f4ef1fbd7bfe49785d8badc673d1395d1d94d85b132ca8ab5ecaf54"),
+                .init(name: "Image.dmg", path: paths.imagePath, size: 15733248,
+                      sha256: "05fd807da5e19f030fa4941f24800c965c6c77982ab572dd5d1ef778fb69f9ca"),
+                .init(name: "Image.dmg.trustcache", path: paths.trustcachePath, size: 1895,
+                      sha256: "36af60889ff5a737874a26daeb8e1a0139ebfebec6ec2e4d8f6a3c1bf1dce35c"),
+            ]
+        }
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 120
+        configuration.timeoutIntervalForResource = 600
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        for file in files {
+            if try matches(file, at: URL(fileURLWithPath: file.path)) { continue }
+            try download(file, from: base.appendingPathComponent(file.name), session: session)
+        }
+        if !cryptex {
+            for path in [paths.cryptexInfoPath, paths.rootHashPath] where FileManager.default.fileExists(atPath: path) {
+                try FileManager.default.removeItem(atPath: path)
+            }
+        }
+    }
+
+    private static func matches(_ file: FileSpec, at url: URL) throws -> Bool {
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: url.path) else { return false }
+        let attributes = try manager.attributesOfItem(atPath: url.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.size] as? NSNumber)?.int64Value == file.size else { return false }
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return actual == file.sha256
+    }
+
+    private static func download(_ file: FileSpec, from url: URL, session: URLSession) throws {
+        let result = DownloadResult()
+        let semaphore = DispatchSemaphore(value: 0)
+        let task = session.downloadTask(with: url) { temporaryURL, response, error in
+            defer { semaphore.signal() }
+            do {
+                if let error { throw error }
+                guard let temporaryURL, let response = response as? HTTPURLResponse,
+                      response.statusCode == 200,
+                      try matches(file, at: temporaryURL) else {
+                    throw NSError(domain: "GalacWinVerifiedDDI", code: 1,
+                                  userInfo: [NSLocalizedDescriptionKey:
+                                    "Developer Disk Image download failed verification: \(file.name)"])
+                }
+                let destination = URL(fileURLWithPath: file.path)
+                let manager = FileManager.default
+                try manager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if manager.fileExists(atPath: destination.path) { try manager.removeItem(at: destination) }
+                try manager.moveItem(at: temporaryURL, to: destination)
+            } catch {
+                result.error = error
+            }
+        }
+        task.resume()
+        if semaphore.wait(timeout: .now() + 650) == .timedOut {
+            task.cancel()
+            throw NSError(domain: "GalacWinVerifiedDDI", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Developer Disk Image download timed out."])
+        }
+        if let error = result.error { throw error }
+    }
+}
+#endif
+
 private enum MadeiraJITWork {
     /// One request at a time, as the XPC handler ran them before.
     static let queue = DispatchQueue(label: "com.galaczzy.galacwin.jit-helper")
@@ -72,6 +182,9 @@ private enum MadeiraJITWork {
 
             switch request.operation {
             case .prepare:
+                #if !targetEnvironment(simulator)
+                try VerifiedDDI.prepare(paths)
+                #endif
                 let readiness = StikJIT.prepareDevice(
                     pairingFile: pairingURL, paths: paths,
                     progress: { NSLog("[MadeiraJIT] prepare: %@", String(describing: $0)) })
@@ -96,6 +209,9 @@ private enum MadeiraJITWork {
                                   userInfo: [NSLocalizedDescriptionKey:
                                     "The target process or Madeira JIT script was not provided."])
                 }
+                #if !targetEnvironment(simulator)
+                try VerifiedDDI.prepare(paths)
+                #endif
                 try StikJIT.enableJIT(
                     targetPID: targetPID,
                     pairingFile: pairingURL,
