@@ -2,6 +2,8 @@
 
 La siguiente revisión de código, todavía sin IPA instalado, limita a 1 MiB la
 lectura de archivos de emparejamiento y del traspaso de la cuenta de firma.
+Un archivo de emparejamiento colocado en `Documents` no puede sustituir una
+credencial que ya exista en el llavero; la copia redundante se elimina.
 El helper JIT protege su copia temporal con la clase de protección completa de
 iPadOS y permisos `0600`. Las credenciales de emparejamiento, firma, Steam y
 Epic se actualizan en el llavero sin borrar antes la entrada anterior: un error

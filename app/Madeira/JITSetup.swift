@@ -141,7 +141,24 @@ enum JITPairingFileStore {
     private static func moveLegacyFile() {
         let manager = FileManager.default
         let file = legacyFolder.appendingPathComponent("pairingFile.plist")
-        guard manager.fileExists(atPath: file.path),
+        guard manager.fileExists(atPath: file.path) else { return }
+        // Documents is also visible to Windows programs in the app. A file left
+        // there must never replace a credential already protected by Keychain.
+        var existing: AnyObject?
+        let status = SecItemCopyMatching([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ] as CFDictionary, &existing)
+        if status == errSecSuccess {
+            if (try? manager.removeItem(at: file)) != nil {
+                LogStore.shared.log("[jit] redundant pairing file removed from Documents")
+            }
+            return
+        }
+        guard status == errSecItemNotFound,
               let data = try? readPairingFile(at: file) else { return }
         let kept = UserDefaults.standard.string(forKey: sourceKey).flatMap(JITPairingSource.init(rawValue:)) ?? .imported
         // Deleted only once the Keychain holds it (a locked device keeps it for later).

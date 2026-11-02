@@ -99,8 +99,9 @@ require('data.write(' not in pstore and pstore.count('.documentDirectory') == 1
         and 'private static var legacyFolder' in pstore,
         'the pairing file is never written to Documents (only the old copy is read there)')
 legacy = block(setup, 'private static func moveLegacyFile(')
-require(legacy.index('try? store(data, source: kept)') < legacy.index('removeItem(at: file)'),
-        'an old Documents copy is deleted only after the Keychain holds it')
+require('SecItemCopyMatching(' in legacy and 'if status == errSecSuccess' in legacy
+        and legacy.index('try? store(data, source: kept)') < legacy.rindex('removeItem(at: file)'),
+        'a Documents copy cannot replace a Keychain pairing and migration deletes it only after saving')
 require('try store(try readPairingFile(at: source), source: .imported)' in setup
         and 'let data = try? readPairingFile(at: file)' in pstore
         and 'data.count <= maximumFileSize' in pstore

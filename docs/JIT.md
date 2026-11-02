@@ -104,7 +104,9 @@ deleted the first time Madeira reads it. An installer that already holds this
 iPhone's pairing file hands it over the same way:
 [SideInstaller](https://github.com/FrizzleM/SideInstaller) writes it there when
 it installs Madeira, and Madeira takes it in, as an imported file, the next time
-it looks for one.
+it looks for one. A file in Documents cannot replace a pairing that is already
+in the Keychain; a redundant copy is removed. To replace a pairing deliberately,
+use the import control in JIT setup or start a new on-device pairing.
 
 The app reads at most 1 MiB from an imported or handed-over pairing file before
 validating its plist. If the Keychain update fails, the existing pairing stays
