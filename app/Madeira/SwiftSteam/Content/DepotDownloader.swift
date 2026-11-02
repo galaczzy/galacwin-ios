@@ -150,15 +150,15 @@ final class DepotDownloader {
             throw SteamError.depotNotFound(app.appID)
         }
 
-        // 2. Prepare files and load journals off the main actor.
+        // 2. Prepare files without trusting journals or resizing existing files.
         let prepared = try await Task.detached(priority: .userInitiated) {
             try Self.prepare(plans: plans, gameRoot: gameRoot, journalRoot: journalRoot)
         }.value
         state.totalBytes = prepared.totalBytes
-        state.doneBytes = prepared.doneBytes
+        state.doneBytes = 0
         state.phase = .downloading
         report(state)
-        SteamLog.event("[steam-depot] install begin app=\(app.appID) depots=\(plans.count) files=\(prepared.fileCount) resume=\(prepared.doneBytes > 0 ? 1 : 0)")
+        SteamLog.event("[steam-depot] install begin app=\(app.appID) depots=\(plans.count) files=\(prepared.fileCount) existing=\(prepared.existing.contains { $0.contains(true) } ? 1 : 0)")
 
         let remaining = prepared.remainingUncompressed
         if remaining > 0 {
@@ -223,6 +223,15 @@ final class DepotDownloader {
 
         if state.reusedBytes > 0 {
             SteamLog.event("[steam-depot] checked app=\(app.appID) reused-bytes=\(state.reusedBytes) fetched-bytes=\(state.doneBytes &- resumedBytes)")
+        }
+
+        // A failed chunk must not truncate an existing file. Apply final sizes
+        // only after every chunk has either matched its digest or been fetched.
+        for (index, plan) in plans.enumerated() {
+            for (fileIndex, file) in plan.manifest.files.enumerated() {
+                let path = prepared.paths[index][fileIndex]
+                if !path.isEmpty { _ = try gameRoot.sizeFile(path, to: file.size) }
+            }
         }
 
         // 4. Install record. Sizes come from the manifests; no tree walk.
@@ -310,7 +319,6 @@ final class DepotDownloader {
         var pending: [[WorkItem]] = []   // per depot: chunks still to fetch
         var journals: [URL] = []
         var totalBytes: UInt64 = 0
-        var doneBytes: UInt64 = 0
         var totalUncompressed: UInt64 = 0
         var remainingUncompressed: UInt64 = 0
         var fileCount = 0
@@ -329,7 +337,6 @@ final class DepotDownloader {
         for plan in plans {
             try Task.checkCancellation()
             let journalURL = journalRoot.url.appendingPathComponent("depot_\(plan.depotID)_\(plan.manifestGID).journal")
-            let done = JournalWriter.load(journalURL, root: journalRoot)
             var paths: [String] = []
             var existing: [Bool] = []
             var pending: [WorkItem] = []
@@ -341,12 +348,11 @@ final class DepotDownloader {
                     if file.flags & 0x200 == 0 { SteamLog.trace("rejected manifest path in depot \(plan.depotID)") }
                     paths.append(""); existing.append(false); continue
                 }
-                let url = gameRoot.url.appendingPathComponent(relative)
                 if file.isDirectory {
                     try gameRoot.ensureDirectory(relative)
                     paths.append(""); existing.append(false); continue
                 }
-                let beforeSize = try gameRoot.sizeFile(relative, to: file.size)
+                let beforeSize = try gameRoot.inspectFile(relative, expectedSize: file.size)
                 let hadContent = beforeSize > 0
                 existing.append(hadContent)
                 paths.append(relative)
@@ -356,12 +362,10 @@ final class DepotDownloader {
                 for (chunkIndex, chunk) in file.chunks.enumerated() {
                     let item = WorkItem(file: fileIndex, chunk: chunkIndex)
                     result.totalBytes += UInt64(chunk.compressedSize)
-                    if done.contains(item.key) {
-                        result.doneBytes += UInt64(chunk.compressedSize)
-                    } else {
-                        pending.append(item)
-                        pendingBytes += UInt64(chunk.uncompressedSize)
-                    }
+                    // A journal is only a progress hint: verify on-disk bytes
+                    // against each manifest digest before skipping a download.
+                    pending.append(item)
+                    pendingBytes += UInt64(chunk.uncompressedSize)
                 }
                 // Space already allocated to an existing file is reused; only
                 // its growth needs new space (sparse new files need all of it).
@@ -925,6 +929,23 @@ final class SecureInstallDirectory: @unchecked Sendable {
         }
         return before
     }
+
+    func inspectFile(_ relative: String, expectedSize: UInt64) throws -> UInt64 {
+        guard expectedSize <= DepotManifest.maxFileSize else {
+            throw SteamError.chunkDownloadFailed("Manifest file size exceeds limit")
+        }
+        let file = try openFile(relative, flags: O_WRONLY | O_CREAT, createParents: true)
+        defer { close(file) }
+        var info = stat()
+        guard fstat(file, &info) == 0, info.st_size >= 0 else {
+            throw SteamError.chunkDownloadFailed("Cannot inspect game file")
+        }
+        let before = UInt64(info.st_size)
+        if expectedSize == 0 && before > 0 {
+            throw SteamError.manifestFetchFailed("Refusing to erase an existing game file with an empty manifest entry")
+        }
+        return before
+    }
 }
 
 /// Keeps CDN transfers off the heap until their size and final origin are checked.
@@ -1050,20 +1071,6 @@ final class JournalWriter {
         try? handle.close()
     }
 
-    static func load(_ url: URL, root: SecureInstallDirectory) -> Set<UInt64> {
-        guard let descriptor = try? root.openFile(url.lastPathComponent, flags: O_RDONLY) else { return [] }
-        let reader = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        defer { try? reader.close() }
-        // A corrupted or substituted journal is not allowed to consume memory
-        // proportional to an untrusted file on an external drive.
-        var info = stat()
-        guard fstat(descriptor, &info) == 0, info.st_size >= 0, info.st_size <= 16 << 20,
-              let data = try? reader.readToEnd(),
-              let text = String(data: data, encoding: .utf8) else { return [] }
-        var keys = Set<UInt64>()
-        for line in text.split(separator: "\n") { if let key = UInt64(line, radix: 16) { keys.insert(key) } }
-        return keys
-    }
 }
 
 extension URL {

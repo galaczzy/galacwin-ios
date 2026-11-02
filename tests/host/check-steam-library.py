@@ -980,7 +980,7 @@ func packageBuffer(apps: [UInt32], depots: [UInt32]) -> Data {
     session.authToken = fx["auth"] as! String
     session.licenses = [21]
     session.packageBuffers = [21: packageBuffer(apps: [9000, 9100], depots: [9001, 9003])]
-    let version = phase == "update" ? 2 : 1
+    let version = phase == "update" || phase == "failed-update" ? 2 : 1
     let gid = (fx["gid\(version)"] as! Int)
     let gidShared = fx["gidShared"] as! Int
     let build = version == 1 ? 1000 : 1001
@@ -1008,12 +1008,12 @@ func packageBuffer(apps: [UInt32], depots: [UInt32]) -> Data {
         print("RESULT install=ok")
     } catch {
         print("RESULT install=failed reason=\(SteamOwnedLibrary.reason(error))")
-        require(phase == "interrupt" || phase == "refused-licensed", "install failed only where the phase expects it (\(error))")
+        require(phase == "interrupt" || phase == "failed-update" || phase == "refused-licensed", "install failed only where the phase expects it (\(error))")
         if phase == "refused-licensed" { require(error as? SteamError == .depotKeyNotFound(9004), "a refusal for a depot the account is licensed for fails the install") }
     }
     let found = MadeiraDock.games(drive: drive)
     print("RESULT listed=\(found.filter { $0.id == 9000 && $0.installed }.count)")
-    if phase != "interrupt" && phase != "refused-licensed" {
+    if phase != "interrupt" && phase != "failed-update" && phase != "refused-licensed" {
         require(lastProgress.phase == .finishing && lastProgress.doneBytes == lastProgress.totalBytes && lastProgress.totalBytes > 0, "progress ends complete: \(lastProgress.doneBytes)/\(lastProgress.totalBytes)")
         // Keys are asked for with the app being installed; manifest codes and tokens with the app that owns the content.
         require(session.keyRequests.contains { $0.depot == 9001 && $0.app == 9000 } && session.keyRequests.contains { $0.depot == 9003 && $0.app == 9000 }, "depot keys are requested for the installed app")
@@ -1207,7 +1207,15 @@ try:
             done.add(depot.files[key >> 32]['chunks'][key & 0xffffffff][0].hex())
     require(len(done) >= 1 and len(state.served_ok) >= 1, f'{len(done)} chunks journaled after {len(state.served_ok)} served')
 
-    # ---- resume: the journaled chunks are not fetched again; the install finishes
+    # A local journal may be corrupted or edited. Claim that every chunk was
+    # completed; the downloader must still verify actual file bytes.
+    main_journal = steam_apps / f'downloading/9000/depot_9001_{gid1}.journal'
+    with main_journal.open('a') as handle:
+        for file_index, entry in enumerate(version1.files):
+            for chunk_index in range(len(entry['chunks'])):
+                handle.write(f'{(file_index << 32) | chunk_index:x}\n')
+
+    # ---- resume: verified chunks are not fetched again; false journal claims are ignored
     state.limit = None
     state.reset_counters()
     result = run('resume', fixture)
@@ -1250,7 +1258,17 @@ try:
         refused = error.code == 403
     require(refused, 'the server itself refuses a request without the authorization (so the check above means something)')
 
-    # ---- update: only what changed is fetched, files shrink
+    # A failed update must not shrink an existing file before the new chunk is
+    # verified. The recorded build also remains the installed version.
+    state.reset_counters()
+    state.limit = 0
+    result = run('failed-update', fixture)
+    require(result.get('install') == 'failed' and (folder / 'data/Assets.dat').read_bytes() == ASSETS and
+            (steam_apps / 'appmanifest_9000.acf').read_text().find('"buildid"\t\t"1000"') >= 0,
+            'a failed update leaves the existing shorter-target file and install record intact')
+
+    # ---- update: only what changed is fetched, files shrink after completion
+    state.limit = None
     state.reset_counters()
     result = run('update', fixture)
     new_sha = hashlib.sha1(data(60000, 99)).hexdigest()
