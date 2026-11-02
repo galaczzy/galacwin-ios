@@ -2,6 +2,8 @@ name: Check source-built StikJIT
 
 on:
   workflow_dispatch:
+  push:
+    branches: [jit-source-build]
 
 permissions:
   contents: read
