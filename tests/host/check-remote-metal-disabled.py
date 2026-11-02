@@ -8,6 +8,7 @@ root = Path(__file__).resolve().parents[2]
 view = (root / "app/Madeira/ContentView.swift").read_text(encoding="utf-8")
 bridge = (root / "app/Madeira/WineProcessBridge.m").read_text(encoding="utf-8")
 catalog = (root / "app/Madeira/ConfigCatalog.generated.swift").read_text(encoding="utf-8")
+settings = (root / "app/Madeira/ConfigCatalog.swift").read_text(encoding="utf-8")
 generator = (root / "build/tools/gen-config-catalog.py").read_text(encoding="utf-8")
 
 remote = view[view.index("// Remote Metal currently sends its token"):view.index("// madeira-d3d12:", view.index("// Remote Metal currently sends its token"))]
@@ -27,5 +28,11 @@ assert thread.count("madeira_env_is_locked(k.UTF8String)") >= 2
 for key in ('remote', 'env.DXMT_REMOTE_METAL'):
     assert f'ConfigOption(key: "{key}"' not in catalog
     assert f'"{key}"' in generator[generator.index('for key in ("remote"'):]
+for key in ('remote', 'env.DXMT_REMOTE_METAL', 'env.RMETAL_TOKEN'):
+    assert f'"{key}"' in settings[settings.index('static let disabledKeys:'):]
+assert 'guard !ConfigCatalog.disabledKeys.contains(key) else { return }' in settings
+assert 'ConfigCatalog.disabledKeys.contains(newKey.trimmingCharacters(in: .whitespaces))' in settings
+assert '[all-settings] \\(key) = \\(stored' not in settings
+assert '[settings-search] \\(key) = \\(stored' not in settings
 
 print("PASS: remote Metal token cannot be enabled through app, global or game configuration")

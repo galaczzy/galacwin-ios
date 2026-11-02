@@ -59,13 +59,14 @@ struct AllSettingsView: View {
 
     private func binding(_ key: String) -> Binding<String?> {
         Binding(get: { values[key] }, set: { new in
+            guard !ConfigCatalog.disabledKeys.contains(key) else { return }
             let v = new?.trimmingCharacters(in: .whitespaces)
             let stored = (v?.isEmpty ?? true) ? nil : v
             guard stored != values[key] else { return }
             MadeiraConfig.set(key, stored)
             values = MadeiraConfig.all()
             changed = true
-            LogStore.shared.log("[all-settings] \(key) = \(stored ?? "(default)")")
+            LogStore.shared.log("[all-settings] \(key) \(stored == nil ? "reset" : "set")")
         })
     }
 
@@ -107,11 +108,13 @@ struct AllSettingsView: View {
                         .textInputAutocapitalization(.never).autocorrectionDisabled().font(.body.monospaced())
                     Button("Add to madeira.cfg") {
                         let k = newKey.trimmingCharacters(in: .whitespaces)
-                        guard !k.isEmpty, !k.contains("="), !k.hasPrefix("#") else { return }
+                        guard !k.isEmpty, !k.contains("="), !k.hasPrefix("#"),
+                              !ConfigCatalog.disabledKeys.contains(k) else { return }
                         binding(k).wrappedValue = newValue
                         newKey = ""; newValue = ""
                     }
-                    .disabled(newKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(newKey.trimmingCharacters(in: .whitespaces).isEmpty
+                              || ConfigCatalog.disabledKeys.contains(newKey.trimmingCharacters(in: .whitespaces)))
                 } header: { Text("Add an entry") } footer: {
                     Text("For anything not listed, such as env.FEX_TSOENABLED = 1.")
                 }
@@ -206,7 +209,7 @@ struct SettingsSearchResults: View {
             guard stored != values[key] else { return }
             MadeiraConfig.set(key, stored)
             values = MadeiraConfig.all()
-            LogStore.shared.log("[settings-search] \(key) = \(stored ?? "(default)")")
+            LogStore.shared.log("[settings-search] \(key) \(stored == nil ? "reset" : "set")")
         })
     }
 
