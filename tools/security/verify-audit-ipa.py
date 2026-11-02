@@ -101,7 +101,9 @@ def main():
         for source, bundled in [("COPYING", "licenses/LICENSE-MADEIRA-GPL-3.0.txt"),
                                 ("LICENSE-EXCEPTION.md", "licenses/LICENSE-MADEIRA-EXCEPTION.txt"),
                                 ("LICENSE-GALACWIN-EXCEPTION.md", "licenses/LICENSE-GALACWIN-EXCEPTION.txt")]:
-            if read_small(archive, bundled, 1024 ** 2) != (ROOT / source).read_bytes():
+            source_bytes = subprocess.check_output(
+                ["git", "-C", str(ROOT), "show", f"{args.source_revision}:{source}"])
+            if read_small(archive, bundled, 1024 ** 2) != source_bytes:
                 fail(f"bundled license differs from source: {source}")
         from importlib.util import module_from_spec, spec_from_file_location
         module_path = ROOT / "tools/security/check_prefix_template.py"
