@@ -39,6 +39,12 @@ biblioteca con Wi-Fi apagado, sin avisos. **JIT sigue sin aprobarse.** Esta
 prueba de interfaz no inspeccionó el paquete vuelto a firmar ni ejercitó juegos
 o cuentas.
 
+En una prueba adicional con Wi-Fi y sin cuentas ni JIT, el usuario indicó que
+GalacWin v2 no apareció en «Actividad de red de las apps» de iPadOS tras varios
+minutos. Esto es un resultado inconcluso del informe, no una prueba de ausencia
+de tráfico. La observación anterior de «sin dominios registrados» pertenecía
+al IPA v1.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`
