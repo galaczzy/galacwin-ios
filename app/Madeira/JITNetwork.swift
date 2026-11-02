@@ -193,7 +193,7 @@ enum JITShortcutFile {
 ///
 /// An app can only run a shortcut by opening the Shortcuts app, so each run leaves
 /// Madeira for a moment and comes back through x-callback-url
-/// (madeira://jit-network/...). Off unless Settings › JIT › Madeira JIT shortcut
+/// (galacwin://jit-network/...). Off unless Settings › JIT › Madeira JIT shortcut
 /// turns it on (madeira.cfg env.MADEIRA_JIT_SHORTCUT = 1): without the shortcut the
 /// Shortcuts app would only report that it is missing.
 @MainActor final class JITNetworkShortcut: ObservableObject {
@@ -291,9 +291,9 @@ enum JITShortcutFile {
             URLQueryItem(name: "name", value: Self.name),
             URLQueryItem(name: "input", value: "text"),
             URLQueryItem(name: "text", value: input),
-            URLQueryItem(name: "x-success", value: "madeira://jit-network/success"),
-            URLQueryItem(name: "x-error", value: "madeira://jit-network/error"),
-            URLQueryItem(name: "x-cancel", value: "madeira://jit-network/cancel")
+            URLQueryItem(name: "x-success", value: "galacwin://jit-network/success"),
+            URLQueryItem(name: "x-error", value: "galacwin://jit-network/error"),
+            URLQueryItem(name: "x-cancel", value: "galacwin://jit-network/cancel")
         ]
         guard let url = c.url else { completion(.failed("bad shortcut URL")); return }
         LogStore.shared.log("[jit-shortcut] run input=\(input)")
@@ -306,10 +306,10 @@ enum JITShortcutFile {
         }
     }
 
-    /// madeira://jit-network/{success|error|cancel}, from Shortcuts' x-callback-url.
+    /// galacwin://jit-network/{success|error|cancel}, from Shortcuts' x-callback-url.
     @discardableResult
     func handle(_ url: URL) -> Bool {
-        guard url.scheme == "madeira", url.host == "jit-network" else { return false }
+        guard url.scheme == "galacwin", url.host == "jit-network" else { return false }
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let value = { (name: String) in query.first { $0.name == name }?.value ?? "" }
         switch url.path {

@@ -165,7 +165,7 @@ require('.alert(jitProblem == nil ? "Library" : "Couldn\'t Enable JIT"' in body,
         "the library's error alert is on the tab view, shown on the Settings tab as well")
 require('URL(string: "localdevvpn://enable?scheme=madeira")' in setup
         and "localdevvpn" in app_plist["LSApplicationQueriesSchemes"]
-        and any("madeira" in t.get("CFBundleURLSchemes", []) for t in app_plist.get("CFBundleURLTypes", [])),
+        and any("galacwin" in t.get("CFBundleURLSchemes", []) for t in app_plist.get("CFBundleURLTypes", [])),
         "LocalDevVPN opens to connect and returns to Madeira's own URL scheme")
 
 # Play without JIT runs Enable JIT, then starts the game, once: only with the debugger

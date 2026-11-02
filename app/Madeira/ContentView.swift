@@ -1390,7 +1390,7 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: SteamSignIn.didChange)) { _ in
                 if !SteamSignIn.isSignedIn { MadeiraDock.cleanup() }
             }
-            // A Home Screen shortcut (madeira://play?exe=...) starts its library entry,
+            // A Home Screen shortcut (galacwin://play?exe=...) starts its library entry,
             // now or, from a cold start, once the library is up.
             .onReceive(ShortcutRouter.shared.$pendingExe) { _ in launchPendingShortcut() }
             .onChange(of: library.enabled) { _, _ in launchPendingShortcut() }

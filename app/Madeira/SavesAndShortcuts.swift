@@ -8,7 +8,7 @@
 //   id takes with it. Settings › Saves writes every Windows user's Documents,
 //   Saved Games and AppData (caches, and Valve's client and web caches, left
 //   out) into one zip to keep in Files or iCloud Drive, and puts one back.
-// * Home Screen shortcuts. madeira://play?exe=<Windows path> starts that game
+// * Home Screen shortcuts. galacwin://play?exe=<Windows path> starts that game
 //   if it is in the library (after JIT, like Play on its details page). Game
 //   details copies the link; the Shortcuts app turns it into a Home Screen icon.
 
@@ -29,14 +29,14 @@ final class ShortcutRouter: ObservableObject {
 
     static func link(for windowsPath: String) -> String {
         var c = URLComponents()
-        c.scheme = "madeira"
+        c.scheme = "galacwin"
         c.host = "play"
         c.queryItems = [URLQueryItem(name: "exe", value: windowsPath)]
-        return c.string ?? "madeira://play"
+        return c.string ?? "galacwin://play"
     }
 
     func handle(_ url: URL) {
-        guard url.scheme?.lowercased() == "madeira", url.host?.lowercased() == "play",
+        guard url.scheme?.lowercased() == "galacwin", url.host?.lowercased() == "play",
               let exe = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "exe" })?.value, !exe.isEmpty else { return }
         LogStore.shared.log("[shortcut] asked to start \(exe)")
