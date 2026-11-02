@@ -9,8 +9,9 @@ artefacto público contiene únicamente un IPA cifrado para la clave guardada
 fuera del repositorio. El IPA descifrado pasó la verificación estática local.
 ClamAV 1.5.4 no halló firmas de malware conocidas en una pasada completa, pero
 sí señaló `PUA.Win.Packer.Embedpe-3` en el `kernel32.dll` ARM64EC construido de
-Wine. Falta probar el IPA en un dispositivo y no está aprobado para usar con
-cuentas personales.** Una revisión de
+Wine. El usuario confirmó la instalación en un iPad Pro M5 y una apertura sin
+Wi-Fi hasta la biblioteca, sin avisos ni permisos solicitados. JIT, juegos y
+uso con cuentas personales siguen sin validarse.** Una revisión de
 código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
 
 ## Controles aplicados
@@ -94,11 +95,13 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
    loopback por defecto, pero el cliente de la app aún usa TCP sin cifrar
    cuando se configura `remote`.
 6. Obtener, si se desea, confirmación del proveedor sobre la alerta PUA de
-   ClamAV y probar el IPA en un iPad con datos de prueba antes de introducir
-   cuentas personales. La compilación macOS/Xcode
-   de auditoría, la verificación estática y una pasada antivirus sin firmas
-   de malware terminaron correctamente; no demuestran seguridad de
-   comportamiento en el dispositivo.
+   ClamAV y ampliar las pruebas en el iPad con datos de prueba antes de
+   introducir cuentas personales. La instalación y la apertura sin Wi-Fi
+   hasta la biblioteca fueron confirmadas por el usuario, sin instrumentación
+   independiente del paquete vuelto a firmar por Sideloadly. La compilación
+   macOS/Xcode de auditoría, la verificación estática y una pasada antivirus
+   sin firmas de malware terminaron correctamente; ninguna de estas pruebas
+   demuestra seguridad de comportamiento en todas las funciones.
 
 La app ejecuta juegos de Windows dentro de su propio proceso. Un juego o
 instalador malicioso sigue siendo un riesgo independiente de la procedencia del
