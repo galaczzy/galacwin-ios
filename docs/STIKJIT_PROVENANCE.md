@@ -48,3 +48,45 @@ estado HTTP, pero no fija hashes de los archivos antes de guardarlos. Se
 necesita revisar esta ruta y el proceso de montaje antes de habilitar JIT
 integrado para la prueba con una cuenta o dispositivo personal. Ninguna de
 estas observaciones demuestra por sí sola que el framework sea malicioso.
+
+## Reconstrucción experimental desde fuentes fijadas
+
+En la rama `jit-source-build` se reconstruyó el archivo FFI de `idevice` desde
+el commit `d32c8189c51c2789496b0768039419c3705498c3` de la etiqueta
+`v0.1.68`, con Rust 1.99.0, `Cargo.lock`, destino `aarch64-apple-ios` y las
+funciones `full,rustcrypto`. Se desactivó la opción `obfuscate` para que las
+cadenas de servicio no se oculten. La biblioteca reconstruida sustituyó al
+archivo precompilado de StikJIT 1.9.0 antes de generar el proyecto y compilar
+el framework con Xcode 27.1. El ayudante JIT de GalacWin compiló contra el
+framework resultante en la [ejecución #41472357918](https://github.com/galaczzy/galacwin-ios/actions/runs/41472357918).
+
+La ejecución registró SHA-256
+`f23e822f82d96ab7102c9fcbefe801f4ae8531ba7300b1110e532a14b804c54f`
+para `libidevice_ffi.a` y
+`cedba2339d83fdb77d842655005667eedd15508c611dbd2a0eb4693b0b9d6b89`
+para el binario StikJIT. El ZIP del artefacto descargado coincidió con el
+digest de GitHub `3e827a5809fd8b47f71b90a3c3522fdc7c7e3a0f77b2aeb26f13770e8ea5f7bd`;
+sus diez entradas pasaron la comprobación CRC. Esta es evidencia de que
+**se puede reconstruir y enlazar**, no una prueba funcional de JIT ni una
+auditoría completa de sus dependencias.
+
+El flujo experimental se trasladó a `tools/build/build-stikjit-source.sh` para
+que el siguiente IPA de auditoría reconstruya el framework en la misma
+ejecución. El script fija los commits de `idevice` y StikJIT, exige
+`cargo --locked` y verifica por SHA-256 el ZIP de XcodeGen 2.46.0 antes de
+extraerlo y ejecutarlo. Ese ZIP se descargó sin ejecutarlo en Windows y su
+hash coincidió con el digest de la [versión oficial de
+XcodeGen](https://github.com/yonaskolb/XcodeGen/releases/tag/2.46.0):
+`4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806`.
+El flujo de IPA compara el binario reconstruido con el contenido del IPA antes
+de cifrarlo. Hasta que ese flujo termine y se valide su salida, el IPA v2
+instalado conserva la versión precompilada original.
+
+La [ejecución de comprobación #41474582986](https://github.com/galaczzy/galacwin-ios/actions/runs/41474582986)
+ejecutó el script compartido y terminó correctamente. El ZIP del artefacto
+coincidió con el digest de GitHub
+`b9425940c28b7495e4919321d6c05ffa064f23cd971913c10f7c1a4a10c08e1c`.
+La biblioteca FFI, su encabezado y los diez archivos del framework resultaron
+idénticos byte por byte a los de la ejecución #41472357918. Esto mejora la
+trazabilidad de esta reconstrucción concreta; no demuestra que todo el código
+fuente o sus dependencias sean seguros.

@@ -394,6 +394,13 @@ jobs:
         run: bash tools/build/build-stikjit-source.sh
       - name: Build IPA
         run: tools/build-ipa.sh
+      - name: Verify rebuilt JIT framework is inside the IPA
+        run: |
+          expected="$(shasum -a 256 app/Frameworks/StikJIT.xcframework/ios-arm64/StikJIT.framework/StikJIT | cut -d' ' -f1)"
+          actual="$(unzip -p dist/Madeira.ipa Payload/Madeira.app/Frameworks/StikJIT.framework/StikJIT | shasum -a 256 | cut -d' ' -f1)"
+          test "$expected" = "$actual"
+          test "$actual" != f15ad5c6766fa07d545be283c1c99eccde6a8baa97d73978a09ec080ca6381df
+          echo "Source-built StikJIT in IPA: $actual"
       - name: Verify and encrypt isolated IPA
         if: ${{ inputs.audit_build }}
         run: |
