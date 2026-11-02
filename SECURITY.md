@@ -2,10 +2,13 @@
 
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
-atribuciones. **Sólo se permite una compilación de auditoría aislada en GitHub
-Actions, sin cuentas ni secretos personales. El artefacto de auditoría contiene
-únicamente un IPA cifrado para la clave guardada fuera del repositorio. Todavía no
-está aprobada para instalar ni usar con cuentas personales.** Una revisión de
+atribuciones. **La compilación de auditoría aislada de
+[Actions #41391432408](https://github.com/galaczzy/galacwin-ios/actions/runs/41391432408)
+terminó correctamente el 2026-11-02, sin cuentas ni secretos personales. El
+artefacto público contiene únicamente un IPA cifrado para la clave guardada
+fuera del repositorio. El IPA descifrado pasó la verificación estática local,
+pero todavía falta el análisis antivirus y la prueba en un dispositivo. No está
+aprobado para usar con cuentas personales.** Una revisión de
 código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
 
 ## Controles aplicados
@@ -17,7 +20,7 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
 - El parser de manifiestos de Steam rechaza encabezados de menos de 8 bytes.
 - El parser limita tamaños de archivos, depots y chunks; comprueba sumas,
   conversiones a UInt32 y que cada chunk quepa dentro de su archivo. El
-  cambio aún requiere compilación y pruebas en macOS.
+  cambio compiló en macOS y pasó una prueba aislada de descarga.
 - Los chunks nuevos de Steam se comparan con el SHA-1 del manifiesto antes de
   escribirse.
 - La preparación del runtime de Visual C++ exige un SHA-256 aprobado del
@@ -60,12 +63,12 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
   el compilador exige su SHA-256 aprobado y rechaza rutas, enlaces y tipos de
   archivo peligrosos. Véase [docs/PREFIX_PROVENANCE.md](docs/PREFIX_PROVENANCE.md).
 
-## Pendiente antes de un IPA de prueba
+## Pendiente antes de considerar el IPA apto para uso personal
 
-1. Revisar los 24 submódulos recursivos en sus commits fijados. Se
-   descargaron localmente sin ejecutarlos; la copia de la auditoría inicial
-   no los contenía y el archivo ZIP del proyecto principal tampoco incluye
-   sus cuerpos.
+1. Revisar los 24 submódulos recursivos en sus commits fijados. La copia de la
+   auditoría inicial y el ZIP del proyecto principal no contenían sus cuerpos.
+   El runner sí descargó y compiló los submódulos, lo cual no equivale a una
+   auditoría de todo su código.
 2. Establecer procedencia independiente de los demás binarios precompilados,
    los archivos restantes del prefijo comprimido, y reconstruir o auditar el código fuente
    de StikJIT. La coincidencia con su ZIP oficial establece el origen del
@@ -88,14 +91,24 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
    prototipo antes de exponerlo en una red; el lanzador de prueba ahora usa
    loopback por defecto, pero el cliente de la app aún usa TCP sin cifrar
    cuando se configura `remote`.
-6. Construir en un macOS/Xcode controlado, inspeccionar el IPA resultante y
-   probarlo en un dispositivo y cuentas de prueba antes de introducir cuentas
-   personales. El usuario no necesita poseer una Mac: un runner macOS de
-   GitHub Actions puede compilar cuando estos controles estén listos.
+6. Completar el análisis antivirus local y probar el IPA en un iPad con datos
+   de prueba antes de introducir cuentas personales. La compilación macOS/Xcode
+   de auditoría y la verificación estática del IPA terminaron correctamente;
+   no demuestran seguridad de comportamiento en el dispositivo.
 
 La app ejecuta juegos de Windows dentro de su propio proceso. Un juego o
 instalador malicioso sigue siendo un riesgo independiente de la procedencia del
-IPA. No se han ejecutado esos binarios ni se ha generado un IPA en esta etapa.
+IPA. No se han ejecutado juegos ni instaladores de terceros en esta etapa.
+
+## Evidencia del IPA de auditoría
+
+- Commit de compilación: `c45f89bb0e4388ac2b0a0bffe9254b241fe9b7c2`.
+- SHA-256 del IPA: `2934828b5d38ad4ba33e73fb32f84b9e220f32294a582f2a76e254a4c41159ba`.
+- El SHA-256 del IPA descifrado coincide con el registro del runner. El
+  verificador independiente confirmó rutas seguras y únicas en 1432 entradas,
+  identidad de GalacWin, textos de licencia del commit, prefijo Wine fijado,
+  577 archivos de runtime contra sus hashes y CRC completo del ZIP.
+- El archivo IPA sin cifrar no se publicó como artefacto de GitHub.
 
 ## Evidencia local
 
