@@ -111,3 +111,11 @@ de v2. El usuario confirmó que Sideloadly instaló v3 y que GalacWin llegó a
 la biblioteca en un iPad Pro M5 con Wi-Fi apagado, JIT desactivado y sin avisos.
 La reconstrucción y estas comprobaciones no demuestran ausencia absoluta de
 malware ni validan la función JIT, juegos o cuentas personales.
+
+En el iPad, el usuario informó que LocalDevVPN estaba conectado, que el
+emparejamiento integrado persistió después de reiniciar la app y que el
+segundo «Check setup» terminó correctamente; el primero permaneció más de
+diez minutos sin resultado. «Enable JIT» mostró «Built-in JIT is attached».
+Esto valida la ruta de preparación y conexión desde la interfaz en esa sesión,
+pero no demuestra que un bloque generado de código JIT se haya ejecutado ni
+reemplaza una observación independiente del dispositivo.

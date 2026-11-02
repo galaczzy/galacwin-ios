@@ -56,7 +56,16 @@ señaló sólo la misma firma `PUA.Win.Packer.Embedpe-3` del `kernel32.dll` de W
 que en v2. El usuario confirmó que Sideloadly instaló v3 y que GalacWin llegó
 a la biblioteca en un iPad Pro M5 con Wi-Fi apagado, JIT desactivado y sin
 avisos. Estos resultados no prueban que el código o sus dependencias estén
-libres de malware ni validan JIT.
+libres de malware ni validan la ejecución de código JIT.
+
+En una prueba posterior, el usuario confirmó que LocalDevVPN tenía las
+direcciones locales esperadas y estaba conectado. El emparejamiento integrado
+persistió tras reiniciar GalacWin. El primer «Check setup» quedó procesando
+más de diez minutos; tras reiniciar la app, el segundo terminó correctamente.
+«Enable JIT» mostró «Built-in JIT is attached». Es una observación de la
+interfaz comunicada por el usuario: todavía no se ha probado la ejecución de
+código JIT ni de juegos, ni se ha instrumentado el dispositivo para validar
+el contenido DDI o el tráfico.
 
 ## Controles aplicados
 
