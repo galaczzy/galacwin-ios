@@ -973,6 +973,10 @@ def scan():
         o = opts.setdefault(key, {"key": key, "kind": "text", "default": "", "category": "App & front end",
                                   "note": "", "sources": []})
         o.update({k: v for k, v in extra.items()})
+    # These settings are intentionally rejected by the app until the remote
+    # Metal transport authenticates and encrypts its bearer token.
+    for key in ("remote", "env.DXMT_REMOTE_METAL", "env.RMETAL_TOKEN"):
+        opts.pop(key, None)
     return [opts[k] for k in sorted(opts, key=lambda k: (opts[k]["category"], k.lower()))]
 
 

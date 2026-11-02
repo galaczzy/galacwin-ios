@@ -3100,22 +3100,14 @@ struct ContentView: View {
                 }
             }
 
-            // ml762: remote Metal backend. Documents/madeira-remote.txt holds
-            // "<host-ip> <token>" and routes winemetal to a Metal daemon on that
-            // host instead of the local device. The mode is decided ONCE per
-            // process: flipping it later would leave handles from two address
-            // spaces alive at the same time, which is precisely what the handle
-            // tag exists to make impossible.
-            if let txt = MadeiraConfig.get("remote") {
-                let parts = txt.trimmingCharacters(in: .whitespacesAndNewlines)
-                                .split(separator: " ", maxSplits: 1).map(String.init)
-                if parts.count == 2 {
-                    setenv("DXMT_REMOTE_METAL", parts[0], 1)
-                    setenv("RMETAL_TOKEN", parts[1], 1)
-                    logStore.log("remote Metal: host=\(parts[0]) via madeira.cfg remote", level: .success)
-                } else if !parts.isEmpty {
-                    logStore.log("madeira.cfg remote needs '<host-ip> <token>'", level: .error)
-                }
+            // Remote Metal currently sends its token over raw TCP. Do not enable
+            // it from the legacy file or madeira.cfg until the transport is
+            // authenticated and encrypted. The native env export path enforces
+            // the same rule for env.* and per-game settings.
+            unsetenv("DXMT_REMOTE_METAL")
+            unsetenv("RMETAL_TOKEN")
+            if let remote = MadeiraConfig.get("remote"), !remote.isEmpty {
+                logStore.log("Remote Metal is disabled until its transport is secure.", level: .error)
             }
 
             // madeira-d3d12: M1 shader-converter gate, in-app.

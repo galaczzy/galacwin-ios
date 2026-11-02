@@ -30,12 +30,13 @@ struct ConfigOption: Identifiable {
 }
 
 enum ConfigCatalog {
+    static let disabledKeys: Set<String> = ["remote", "env.DXMT_REMOTE_METAL", "env.RMETAL_TOKEN"]
     /// Categories in the order the catalog lists them.
     static let categories: [String] = {
         var seen = Set<String>()
         return generated.map(\.category).filter { seen.insert($0).inserted }
     }()
-    static let keys = Set(generated.map(\.key))
+    static let keys = Set(generated.map(\.key)).union(disabledKeys)
 }
 
 /// Settings › All settings: every catalogued option, editable in place.

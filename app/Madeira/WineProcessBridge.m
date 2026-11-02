@@ -409,6 +409,9 @@ static const char *g_madeira_docs_early = "not-run";
  * unless a host asks for it. */
 static int madeira_env_is_locked(const char *name)
 {
+    /* The DXMT remote backend sends its bearer token over unencrypted TCP.
+     * Block both global and per-game env exports until that protocol is fixed. */
+    if (name && (!strcmp(name, "DXMT_REMOTE_METAL") || !strcmp(name, "RMETAL_TOKEN"))) return 1;
     const char *locked = getenv("MADEIRA_ENV_LOCKED");
     if (!locked || !*locked || !name || !*name) return 0;
     size_t n = strlen(name);
@@ -1293,6 +1296,10 @@ static void *wine_process_thread(void *arg) {
          * thread_ios.c — default QoS costs tens of ms of sleep leeway). */
         pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
         LOG("Wine process thread started");
+        /* Clear inherited values as well as the app's own configuration path.
+         * The env exporters below refuse to set either variable again. */
+        unsetenv("DXMT_REMOTE_METAL");
+        unsetenv("RMETAL_TOKEN");
 
         /* ml588: seeding itself now happens in wineserver_start(), BEFORE the
          * server loads the registry. Kept here as a safety net for any path
