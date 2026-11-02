@@ -585,6 +585,8 @@ struct JITSetupView: View {
     @ObservedObject private var coordinator = JITCoordinator.shared
     @ObservedObject private var pairing = OnDevicePairing.shared
     @State private var importing = false
+    @State private var executionTestRunning = false
+    @State private var executionTestResult: String?
     @Environment(\.dismiss) private var dismiss
 
     private var pairingLabel: String {
@@ -645,9 +647,18 @@ struct JITSetupView: View {
                             .disabled(coordinator.busy || !coordinator.pairingImported)
                         Button("Enable JIT") { coordinator.enableBuiltIn() }
                             .disabled(coordinator.busy || !coordinator.pairingImported)
+                        Button("Test JIT execution") { runExecutionTest() }
+                            .disabled(coordinator.busy || executionTestRunning || !StikJITHelper.ready)
+                        if executionTestRunning {
+                            HStack { ProgressView(); Text("Running JIT execution test…") }
+                        } else if let executionTestResult {
+                            Text(executionTestResult)
+                        }
                         Button("Reset Developer Disk Image", role: .destructive) {
                             coordinator.resetDDI()
                         }.disabled(coordinator.busy)
+                    } footer: {
+                        Text("The execution test runs a small ARM64 function that returns 42. It may close GalacWin if JIT execution fails; no game or account is used.")
                     }
                 } else {
                     Section {
@@ -694,5 +705,25 @@ struct JITSetupView: View {
             }
         }
         .onAppear { coordinator.refreshPairingStatus() }
+    }
+
+    private func runExecutionTest() {
+        guard StikJITHelper.ready, !executionTestRunning else { return }
+        executionTestResult = nil
+        executionTestRunning = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = jit_test_execute()
+            DispatchQueue.main.async {
+                executionTestRunning = false
+                switch result {
+                case 42:
+                    executionTestResult = "JIT execution passed: the generated function returned 42."
+                case -2:
+                    executionTestResult = "JIT is no longer attached. Enable JIT and try again."
+                default:
+                    executionTestResult = "JIT execution failed (code \(result))."
+                }
+            }
+        }
     }
 }
