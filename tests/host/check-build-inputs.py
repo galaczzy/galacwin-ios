@@ -107,7 +107,8 @@ for component, label, destination in [('llvm', 'LLVM', 'toolchains'),
     # Same-run artifacts avoid trusting outputs from unrelated PRs.
     assert f'name: native-{component}-${{{{ steps.sdk.outputs.key }}}}' in producer
     assert f'name: native-{component}-${{{{ needs.plan.outputs.sdk }}}}' in consumer
-    assert 'actions/download-artifact@v4' in consumer and 'run-id:' not in consumer
+    assert 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4' in consumer
+    assert 'run-id:' not in consumer
     assert f'path: {destination}\n' in consumer
     assert 'continue-on-error: true' in producer and 'continue-on-error: true' in consumer
     assert 'retention-days: 1' in producer and 'overwrite: true' in producer
