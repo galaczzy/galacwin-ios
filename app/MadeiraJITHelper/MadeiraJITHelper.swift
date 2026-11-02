@@ -157,6 +157,17 @@ private enum MadeiraJITWork {
     /// One request at a time, as the XPC handler ran them before.
     static let queue = DispatchQueue(label: "com.galaczzy.galacwin.jit-helper")
 
+    /// A crash bypasses the per-request defer. Remove only our temporary
+    /// credential files before the next serial request uses this directory.
+    private static func removeStalePairingFiles(in root: URL) throws {
+        let manager = FileManager.default
+        for url in try manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
+            let name = url.lastPathComponent
+            guard name.hasPrefix("pairingFile-"), name.hasSuffix(".plist") else { continue }
+            try manager.removeItem(at: url)
+        }
+    }
+
     static func handle(_ request: MadeiraJITRequest) -> MadeiraJITRequest.Response {
         let manager = FileManager.default
         let root = manager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
@@ -165,6 +176,7 @@ private enum MadeiraJITWork {
 
         do {
             try manager.createDirectory(at: root, withIntermediateDirectories: true)
+            try removeStalePairingFiles(in: root)
             if request.operation == .resetDDI {
                 try StikJIT.resetCachedDDI(at: paths)
                 return .init(success: true,
@@ -178,8 +190,8 @@ private enum MadeiraJITWork {
                               userInfo: [NSLocalizedDescriptionKey: "The pairing file was not provided."])
             }
             let pairingURL = root.appendingPathComponent("pairingFile-\(UUID().uuidString).plist")
-            try pairingData.write(to: pairingURL, options: [.atomic, .completeFileProtection])
             defer { try? manager.removeItem(at: pairingURL) }
+            try pairingData.write(to: pairingURL, options: [.withoutOverwriting, .completeFileProtection])
             try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: pairingURL.path)
 
             switch request.operation {

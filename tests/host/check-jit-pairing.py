@@ -107,8 +107,10 @@ require('try store(try readPairingFile(at: source), source: .imported)' in setup
         and 'dictionary["public_key"]' in block(setup, 'static func store('),
         'imports and on-device pairings share bounded reading and validation')
 require('pairingData.count <= MadeiraJITRequest.maximumPairingFileSize' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text()
-        and '.completeFileProtection' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text(),
-        'the helper bounds and protects the temporary pairing file')
+        and '.completeFileProtection' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text()
+        and '.withoutOverwriting' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text()
+        and 'try removeStalePairingFiles(in: root)' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text(),
+        'the helper bounds, protects and removes stale temporary pairing files')
 require('OnDevicePairing.shared.cancel()' in block(setup, 'func importPairingFile('),
         'an import stops a waiting on-device pairing, so it cannot overwrite the import')
 for line in pairing.splitlines():

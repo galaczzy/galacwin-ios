@@ -110,7 +110,9 @@ The app reads at most 1 MiB from an imported or handed-over pairing file before
 validating its plist. If the Keychain update fails, the existing pairing stays
 in place. For each JIT request the helper writes a temporary copy with complete
 file protection and owner-only permissions, then deletes it when the request
-finishes. Keep the device unlocked while JIT setup or enabling JIT runs.
+finishes. If the helper ended unexpectedly, its next request removes any stale
+temporary pairing copy first. Keep the device unlocked while JIT setup or
+enabling JIT runs.
 
 The helper is a classic app extension (`PlugIns/MadeiraJITHelper.appex`, on
 the `com.apple.ar.viewer` extension point, as LiveContainer's LiveProcess is). A
