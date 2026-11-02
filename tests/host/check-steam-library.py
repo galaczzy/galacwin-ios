@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright 2026 125hz
 # Madeira Converter Exception: see LICENSE-EXCEPTION.md
+# GalacWin security modifications by galaczzy, 2026; see LICENSE-GALACWIN-EXCEPTION.md.
 """Host checks for the owned Steam library and downloads (docs/STEAM_LIBRARY.md).
 
 Never contacts Steam. It needs swiftc (Linux), cc, python3 with `cryptography`
@@ -248,8 +249,11 @@ def steam_encrypt(key, data, pad_nul=False):
 def container(kind, data):
     """One of Steam's chunk containers around already-final bytes."""
     if kind == 'zstd':
-        from compression import zstd
-        frame = zstd.compress(data)
+        try:
+            from compression import zstd
+            frame = zstd.compress(data)
+        except ImportError:
+            frame = subprocess.run(['zstd', '--quiet', '--stdout'], input=data, capture_output=True, check=True).stdout
         # header: magic + crc32; footer (15 bytes): crc32 + decompressed size + 4 bytes + 'zsv'
         return b'VSZa' + struct.pack('<I', zlib.crc32(data)) + frame + struct.pack('<II', zlib.crc32(data), len(data)) + bytes(4) + b'zsv'
     if kind == 'lzma':
@@ -316,9 +320,9 @@ class Depot:
             out += f_bytes(1, body)
         return out
 
-    def manifest_zip(self):
+    def manifest_zip(self, gid):
         payload = self.payload()
-        meta = f_varint(1, self.id)
+        meta = f_varint(1, self.id) + f_varint(2, gid)
         binary = (struct.pack('<II', 0x71F617D0, len(payload)) + payload + struct.pack('<II', 0x1F4812BE, len(meta)) + meta +
                   struct.pack('<II', 0x1B81B817, 0) + struct.pack('<I', 0x32C415AB))
         buffer = io.BytesIO()
@@ -918,7 +922,27 @@ func packageBuffer(apps: [UInt32], depots: [UInt32]) -> Data {
             SteamInstallFiles.safeFolderName("c:") == "app", "install folders are one safe component")
     require(DepotDownloader.usableContentHost("cache1.steamcontent.com") && DepotDownloader.usableContentHost("a.b.akamaized.net") &&
             !DepotDownloader.usableContentHost("evil.example.com") && !DepotDownloader.usableContentHost("x.steamcontent.com:8080") &&
-            !DepotDownloader.usableContentHost("a b.steamcontent.com") && !DepotDownloader.usableContentHost("lancache.steamcontent.com"), "content hosts are Valve's, on the standard port")
+            !DepotDownloader.usableContentHost("a b.steamcontent.com") && !DepotDownloader.usableContentHost("lancache.steamcontent.com") &&
+            !DepotDownloader.usableContentHost("evil.example#x.akamaized.net") &&
+            !DepotDownloader.usableContentHost("evil.example?x.steamcontent.com"),
+            "content hosts are Valve's bare DNS names, on the standard port")
+    let manifestBytes = hexData(fx["manifestBinary"] as! String)
+    let fixtureGID = UInt64(fx["gid1"] as! Int)
+    let parsed = try DepotManifest.parse(depotID: 9001, manifestGID: fixtureGID, data: manifestBytes)
+    require(!parsed.files.isEmpty, "a framed manifest with matching depot and GID is accepted")
+    do { _ = try DepotManifest.parse(depotID: 9001, manifestGID: fixtureGID + 1, data: manifestBytes)
+         require(false, "a different requested GID is rejected") }
+    catch { require(true, "a different requested GID is rejected") }
+    do { _ = try DepotManifest.parse(depotID: 9001, manifestGID: fixtureGID, data: Data(manifestBytes[8..<16]))
+         require(false, "bare payload bytes are rejected") }
+    catch { require(true, "bare payload bytes are rejected") }
+    let secureBase = URL(fileURLWithPath: fx["tmp"] as! String).appendingPathComponent("secure-test")
+    let secure = try SecureInstallDirectory(root: secureBase, components: ["common", "Game"])
+    let outside = secureBase.appendingPathComponent("outside.txt")
+    try Data("untouched".utf8).write(to: outside)
+    try FileManager.default.createSymbolicLink(at: secure.url.appendingPathComponent("link.txt"), withDestinationURL: outside)
+    do { _ = try secure.sizeFile("link.txt", to: 1); require(false, "a game-file symlink cannot be truncated") }
+    catch { require((try? Data(contentsOf: outside)) == Data("untouched".utf8), "a game-file symlink cannot be truncated") }
     let server: [String: Any] = ["https_support": "unavailable"]
     require(DepotDownloader.serverEligibility(server, appID: 1) == .noHTTPS &&
             DepotDownloader.serverEligibility(["use_as_proxy": true], appID: 1) == .other &&
@@ -1148,14 +1172,15 @@ try:
     merged = Merged(); merged.chunks = {**version1.chunks, **version2.chunks}
     state.depots = {9001: merged, 9003: shared}
     gid1, gid2, gid_shared = 111111, 222222, 333333
-    m1, binary1 = version1.manifest_zip()
-    m2, binary2 = version2.manifest_zip()
-    ms, _ = shared.manifest_zip()
+    m1, binary1 = version1.manifest_zip(gid1)
+    m2, binary2 = version2.manifest_zip(gid2)
+    ms, _ = shared.manifest_zip(gid_shared)
     state.manifests = {(9001, gid1): m1, (9001, gid2): m2, (9003, gid_shared): ms}
     dead, flaky, good = ContentServer('dead', state), ContentServer('flaky', state), ContentServer('good', state)
     servers = [dead, flaky, good]
     for server in servers: serve(server)
     fixture = dict(key=KEY_MAIN.hex(), keyShared=KEY_SHARED.hex(), vectorPlain=VEC_PLAIN.hex(), vectors=VEC, rawEncrypted=RAW,
+                   manifestBinary=binary1.hex(),
                    hosts=[dead.url, flaky.url, good.url], requestCode=state.request_code, auth=state.auth,
                    gid1=gid1, gid2=gid2, gidShared=gid_shared, tmp=str(work / 'root'))
 

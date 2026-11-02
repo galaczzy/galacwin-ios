@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Jfishin, 125hz
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
+// GalacWin security modifications by galaczzy, 2026; see LICENSE-GALACWIN-EXCEPTION.md.
 //
 // Derived from Jfishin's Madeira Steam client, used in Madeira with the
 // author's permission (see docs/STEAM_SIGNIN.md, "Provenance"). Adapted for
@@ -56,19 +57,50 @@ struct DepotManifest {
             throw SteamError.manifestFetchFailed("Manifest data too small")
         }
 
-        // ContentManifestPayload starts with tag 0x0a (field 1, length-delimited).
-        // Otherwise the blob is: 8B header (4B magic + 4B payloadLen) + protobuf
-        // + a signature trailer — bound the payload by the header's length.
-        let payload: Data
-        if data.first == 0x0A {
-            payload = data
-        } else {
-            guard data.count >= 8 else {
-                throw SteamError.manifestFetchFailed("Manifest header is truncated")
+        // SteamPipe's protobuf manifest has distinct payload, metadata and
+        // signature sections. Validate their framing and bind the metadata to
+        // the CM-selected depot/GID. The signature section can legitimately be
+        // empty; this structural check is not a cryptographic authenticity proof.
+        var cursor = 0
+        func section(_ magic: UInt32) throws -> Data {
+            guard data.count - cursor >= 8 else {
+                throw SteamError.manifestFetchFailed("Manifest section is truncated")
             }
-            let len = Int(data[4..<8].withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self)) })
-            let end = (len > 0 && 8 + len <= data.count) ? 8 + len : data.count
-            payload = Data(data[8..<end])
+            let found = data[cursor..<(cursor + 4)].withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self)) }
+            let length = Int(data[(cursor + 4)..<(cursor + 8)].withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self)) })
+            cursor += 8
+            guard found == magic, length <= data.count - cursor else {
+                throw SteamError.manifestFetchFailed("Manifest section is invalid")
+            }
+            let bytes = Data(data[cursor..<(cursor + length)])
+            cursor += length
+            return bytes
+        }
+        let payload = try section(0x71F617D0)
+        let metadata = try section(0x1F4812BE)
+        _ = try section(0x1B81B817)
+        guard data.count - cursor == 4,
+              data[cursor..<(cursor + 4)].withUnsafeBytes({ UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self)) }) == 0x32C415AB else {
+            throw SteamError.manifestFetchFailed("Manifest end marker is invalid")
+        }
+        var metadataDecoder = ProtobufDecoder(metadata)
+        var actualDepot: UInt32?
+        var actualGID: UInt64?
+        while let tag = try metadataDecoder.readTag() {
+            switch tag.fieldNumber {
+            case 1:
+                guard actualDepot == nil, let value = UInt32(exactly: try metadataDecoder.readVarint()) else {
+                    throw SteamError.manifestFetchFailed("Manifest depot metadata is invalid")
+                }
+                actualDepot = value
+            case 2:
+                guard actualGID == nil else { throw SteamError.manifestFetchFailed("Manifest GID is duplicated") }
+                actualGID = try metadataDecoder.readVarint()
+            default: try metadataDecoder.skip(wireType: tag.wireType)
+            }
+        }
+        guard actualDepot == depotID, actualGID == manifestGID else {
+            throw SteamError.manifestFetchFailed("Manifest identity does not match the request")
         }
 
         var manifest = DepotManifest(
@@ -187,6 +219,16 @@ struct DepotManifest {
                   UInt64(chunk.uncompressedSize) <= size - chunk.offset else {
                 throw SteamError.manifestFetchFailed("Manifest chunk exceeds its file")
             }
+        }
+        if flags & 0x40 == 0 && flags & 0x200 == 0 && size > 0 {
+            var end: UInt64 = 0
+            for chunk in chunks.sorted(by: { $0.offset < $1.offset }) {
+                guard chunk.offset == end else {
+                    throw SteamError.manifestFetchFailed("Manifest file has a missing or overlapping chunk")
+                }
+                end += UInt64(chunk.uncompressedSize)
+            }
+            guard end == size else { throw SteamError.manifestFetchFailed("Manifest file is incomplete") }
         }
 
         let decoded = decryptFilename(filename, depotKey: depotKey)

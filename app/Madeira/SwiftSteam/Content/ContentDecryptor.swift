@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Jfishin, 125hz
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
+// GalacWin security modifications by galaczzy, 2026; see LICENSE-GALACWIN-EXCEPTION.md.
 //
 // Derived from Jfishin's Madeira Steam client, used in Madeira with the
 // author's permission (see docs/STEAM_SIGNIN.md, "Provenance"). Adapted for
@@ -212,7 +213,9 @@ struct ContentDecryptor {
 
     /// A bare LZMA stream, through the Compression framework.
     private static func decompressLZMA(_ data: Data, expectedSize: Int) -> Data? {
-        let outputSize = expectedSize > 0 ? expectedSize : data.count * 10
+        guard expectedSize >= 0, expectedSize <= maximumChunkBytes else { return nil }
+        let estimated = data.count > maximumChunkBytes / 10 ? maximumChunkBytes : data.count * 10
+        let outputSize = expectedSize > 0 ? expectedSize : max(1, estimated)
         var outputBuffer = Data(count: outputSize)
 
         let decompressedSize = data.withUnsafeBytes { srcPtr -> Int in

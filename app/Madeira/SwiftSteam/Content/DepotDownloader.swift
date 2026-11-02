@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Jfishin, 125hz
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
+// GalacWin security modifications by galaczzy, 2026; see LICENSE-GALACWIN-EXCEPTION.md.
 //
 // Derived from Jfishin's Madeira Steam client, used in Madeira with the
 // author's permission (see docs/STEAM_SIGNIN.md, "Provenance"). Substantially
@@ -91,12 +92,10 @@ final class DepotDownloader {
         SteamLog.event("[steam-depot] selection app=\(app.appID) build=\(app.buildID) language=\(app.depotLanguage)/\(app.gameLanguage) \(app.depotSelectionSummary())")
 
         let folderName = SteamInstallFiles.safeFolderName(app.installDir.isEmpty ? "app_\(app.appID)" : app.installDir)
-        let installURL = steamApps.appendingPathComponent("common", isDirectory: true)
-            .appendingPathComponent(folderName, isDirectory: true)
-        let journalDir = steamApps.appendingPathComponent("downloading", isDirectory: true)
-            .appendingPathComponent("\(app.appID)", isDirectory: true)
-        try FileManager.default.createDirectory(at: installURL, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: journalDir, withIntermediateDirectories: true)
+        let gameRoot = try SecureInstallDirectory(root: steamApps, components: ["common", folderName])
+        let journalRoot = try SecureInstallDirectory(root: steamApps, components: ["downloading", "\(app.appID)"])
+        let installURL = gameRoot.url
+        let journalDir = journalRoot.url
 
         var state = SteamDownloadProgress()
         report(state)
@@ -153,7 +152,7 @@ final class DepotDownloader {
 
         // 2. Prepare files and load journals off the main actor.
         let prepared = try await Task.detached(priority: .userInitiated) {
-            try Self.prepare(plans: plans, installURL: installURL, journalDir: journalDir)
+            try Self.prepare(plans: plans, gameRoot: gameRoot, journalRoot: journalRoot)
         }.value
         state.totalBytes = prepared.totalBytes
         state.doneBytes = prepared.doneBytes
@@ -178,7 +177,8 @@ final class DepotDownloader {
         // read once, front to back in large blocks, a few files at a time, and
         // only the chunks that do not match are downloaded below.
         var work = prepared.pending
-        try await checkExisting(plans: plans, prepared: prepared, work: &work, state: &state, report: report)
+        try await checkExisting(plans: plans, prepared: prepared, gameRoot: gameRoot, journalRoot: journalRoot,
+                                work: &work, state: &state, report: report)
 
         // 3. Chunks. Speed counts only what is fetched from here on: bytes
         // resumed or kept by the check are already in doneBytes.
@@ -186,7 +186,7 @@ final class DepotDownloader {
         let resumedBytes = state.doneBytes
         var lastReport = Date.distantPast
         for (index, plan) in plans.enumerated() {
-            let journal = try JournalWriter(url: prepared.journals[index])
+            let journal = try JournalWriter(url: prepared.journals[index], root: journalRoot)
             defer { journal.close() }
             let work = work[index]
             let paths = prepared.paths[index]
@@ -199,7 +199,8 @@ final class DepotDownloader {
                     let chunk = plan.manifest.files[item.file].chunks[item.chunk]
                     let path = paths[item.file]
                     group.addTask {
-                        try await Self.fetchChunk(chunk, plan: plan, path: path, attempts: attempts, seed: item.file &+ item.chunk)
+                        try await Self.fetchChunk(chunk, plan: plan, path: path, root: gameRoot,
+                                                  attempts: attempts, seed: item.file &+ item.chunk)
                         return (item.key, UInt64(chunk.compressedSize), false)
                     }
                 }
@@ -304,7 +305,7 @@ final class DepotDownloader {
     }
 
     struct Prepared: Sendable {
-        var paths: [[String]] = []       // per depot, per file: absolute path ("" = skipped)
+        var paths: [[String]] = []       // per depot, per file: path under gameRoot ("" = skipped)
         var existing: [[Bool]] = []      // per depot, per file: had content before this install
         var pending: [[WorkItem]] = []   // per depot: chunks still to fetch
         var journals: [URL] = []
@@ -315,19 +316,20 @@ final class DepotDownloader {
         var fileCount = 0
     }
 
-    private nonisolated static func prepare(plans: [DepotPlan], installURL: URL, journalDir: URL) throws -> Prepared {
+    private nonisolated static func prepare(plans: [DepotPlan], gameRoot: SecureInstallDirectory,
+                                            journalRoot: SecureInstallDirectory) throws -> Prepared {
         let fm = FileManager.default
         var result = Prepared()
         var folded: [String: String] = [:]   // lowercased relative dir -> first spelling
         let journalNames = Set(plans.map { "depot_\($0.depotID)_\($0.manifestGID).journal" })
         // A journal for an older manifest describes different file contents.
-        for name in (try? fm.contentsOfDirectory(atPath: journalDir.path)) ?? [] where !journalNames.contains(name) {
-            try? fm.removeItem(at: journalDir.appendingPathComponent(name))
+        for name in (try? fm.contentsOfDirectory(atPath: journalRoot.url.path)) ?? [] where !journalNames.contains(name) {
+            _ = unlinkat(journalRoot.fd, name, 0)
         }
         for plan in plans {
             try Task.checkCancellation()
-            let journalURL = journalDir.appendingPathComponent("depot_\(plan.depotID)_\(plan.manifestGID).journal")
-            let done = JournalWriter.load(journalURL)
+            let journalURL = journalRoot.url.appendingPathComponent("depot_\(plan.depotID)_\(plan.manifestGID).journal")
+            let done = JournalWriter.load(journalURL, root: journalRoot)
             var paths: [String] = []
             var existing: [Bool] = []
             var pending: [WorkItem] = []
@@ -339,17 +341,15 @@ final class DepotDownloader {
                     if file.flags & 0x200 == 0 { SteamLog.trace("rejected manifest path in depot \(plan.depotID)") }
                     paths.append(""); existing.append(false); continue
                 }
-                let url = installURL.appendingPathComponent(relative)
+                let url = gameRoot.url.appendingPathComponent(relative)
                 if file.isDirectory {
-                    try fm.createDirectory(at: url, withIntermediateDirectories: true)
+                    try gameRoot.ensureDirectory(relative)
                     paths.append(""); existing.append(false); continue
                 }
-                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                var before = stat()
-                let hadContent = stat(url.path, &before) == 0 && before.st_size > 0
+                let beforeSize = try gameRoot.sizeFile(relative, to: file.size)
+                let hadContent = beforeSize > 0
                 existing.append(hadContent)
-                try sizeFile(url.path, to: file.size)
-                paths.append(url.path)
+                paths.append(relative)
                 result.fileCount += 1
                 result.totalUncompressed += file.size
                 var pendingBytes: UInt64 = 0
@@ -365,7 +365,6 @@ final class DepotDownloader {
                 }
                 // Space already allocated to an existing file is reused; only
                 // its growth needs new space (sparse new files need all of it).
-                let beforeSize = hadContent ? UInt64(before.st_size) : 0
                 result.remainingUncompressed += hadContent
                     ? (file.size > beforeSize ? file.size - beforeSize : 0) : pendingBytes
             }
@@ -377,28 +376,13 @@ final class DepotDownloader {
         return result
     }
 
-    /// Create or resize a file to its manifest length. Existing bytes below
-    /// that length are kept so resumed and updated installs reuse them.
-    private nonisolated static func sizeFile(_ path: String, to size: UInt64) throws {
-        guard size <= DepotManifest.maxFileSize, size <= UInt64(Int64.max) else {
-            throw SteamError.chunkDownloadFailed("Manifest file size exceeds limit")
-        }
-        let fd = open(path, O_WRONLY | O_CREAT, 0o644)
-        guard fd >= 0 else { throw SteamError.chunkDownloadFailed("Cannot create a game file (errno \(errno)).") }
-        defer { close(fd) }
-        var info = stat()
-        if fstat(fd, &info) == 0, UInt64(info.st_size) == size { return }
-        guard ftruncate(fd, off_t(size)) == 0 else {
-            throw SteamError.chunkDownloadFailed("Cannot size a game file (errno \(errno)).")
-        }
-    }
-
     // MARK: - Checking files on disk
 
     /// Checks every pending chunk of the files that had content before this
     /// install. Matching chunks are journaled and counted as done; `work`
     /// keeps only the chunks still to download.
-    private func checkExisting(plans: [DepotPlan], prepared: Prepared, work: inout [[WorkItem]],
+    private func checkExisting(plans: [DepotPlan], prepared: Prepared, gameRoot: SecureInstallDirectory,
+                               journalRoot: SecureInstallDirectory, work: inout [[WorkItem]],
                                state: inout SteamDownloadProgress, report: (SteamDownloadProgress) -> Void) async throws {
         struct FileCheck: Sendable { let depot: Int; let file: Int; let path: String; let items: [WorkItem]; let chunks: [DepotManifest.ChunkEntry] }
         var checks: [FileCheck] = []
@@ -418,9 +402,9 @@ final class DepotDownloader {
         report(state)
         // A drive reached through iOS's user-space file system gains little from
         // more readers at once; this device's own storage takes more.
-        let external = prepared.paths.joined().first { !$0.isEmpty }.map { $0.contains("/LiveFiles/") || $0.contains("/External/") } ?? false
+        let external = gameRoot.url.path.contains("/LiveFiles/") || gameRoot.url.path.contains("/External/")
         let width = external ? 4 : 8
-        let journals = try plans.indices.map { try JournalWriter(url: prepared.journals[$0]) }
+        let journals = try plans.indices.map { try JournalWriter(url: prepared.journals[$0], root: journalRoot) }
         defer { journals.forEach { $0.close() } }
         var bad: [[WorkItem]] = plans.map { _ in [] }
         var keepItems = work
@@ -431,7 +415,7 @@ final class DepotDownloader {
             func enqueue() {
                 guard next < checks.count else { return }
                 let check = checks[next]; next += 1
-                group.addTask { (check, try Self.checkFile(check.path, chunks: check.chunks)) }
+                group.addTask { (check, try Self.checkFile(check.path, root: gameRoot, chunks: check.chunks)) }
             }
             for _ in 0..<min(width, checks.count) { enqueue() }
             for try await (check, results) in group {
@@ -464,9 +448,10 @@ final class DepotDownloader {
     /// Reads one file once, front to back in 16 MB blocks, and compares each
     /// chunk (sorted by offset) with its SHA-1. A missing or short file fails
     /// the chunks it cannot supply.
-    private nonisolated static func checkFile(_ path: String, chunks: [DepotManifest.ChunkEntry]) throws -> [Bool] {
+    private nonisolated static func checkFile(_ path: String, root: SecureInstallDirectory,
+                                              chunks: [DepotManifest.ChunkEntry]) throws -> [Bool] {
         var results = [Bool](repeating: false, count: chunks.count)
-        let fd = open(path, O_RDONLY)
+        let fd = try root.openFile(path, flags: O_RDONLY)
         guard fd >= 0 else { return results }
         defer { close(fd) }
         _ = fcntl(fd, F_NOCACHE, 1)
@@ -495,7 +480,8 @@ final class DepotDownloader {
     // MARK: - Chunks
 
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan,
-                                               path: String, attempts: Int, seed: Int) async throws {
+                                               path: String, root: SecureInstallDirectory,
+                                               attempts: Int, seed: Int) async throws {
         var lastError: Error = SteamError.chunkDownloadFailed("No content server responded.")
         for attempt in 0..<max(1, attempts) {
             try Task.checkCancellation()
@@ -504,7 +490,7 @@ final class DepotDownloader {
             let host = order[attempt % order.count]
             let url = "\(host)/depot/\(plan.depotID)/chunk/\(chunk.shaHex)\(plan.auth[host] ?? "")"
             do {
-                let encrypted = try await download(url)
+                let encrypted = try await download(url, maxBytes: Int(chunk.compressedSize) + 65_536)
                 let data = try ContentDecryptor.processChunk(encryptedData: encrypted, depotKey: plan.key,
                                                              expectedCRC: chunk.crc,
                                                              expectedSize: Int(chunk.uncompressedSize))
@@ -513,7 +499,7 @@ final class DepotDownloader {
                 var digest = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
                 data.withUnsafeBytes { raw in _ = CC_SHA1(raw.baseAddress, CC_LONG(raw.count), &digest) }
                 guard Data(digest) == chunk.sha else { throw SteamError.checksumMismatch }
-                try write(data, to: path, offset: chunk.offset)
+                try write(data, to: path, root: root, offset: chunk.offset)
                 plan.health.recordSuccess(host)
                 return
             } catch is CancellationError {
@@ -536,8 +522,9 @@ final class DepotDownloader {
         return "other"
     }
 
-    private nonisolated static func write(_ data: Data, to path: String, offset: UInt64) throws {
-        let fd = open(path, O_WRONLY)
+    private nonisolated static func write(_ data: Data, to path: String,
+                                          root: SecureInstallDirectory, offset: UInt64) throws {
+        let fd = try root.openFile(path, flags: O_WRONLY)
         guard fd >= 0 else { throw SteamError.chunkDownloadFailed("Cannot open a game file (errno \(errno)).") }
         defer { close(fd) }
         try data.withUnsafeBytes { raw in
@@ -550,13 +537,23 @@ final class DepotDownloader {
         }
     }
 
-    private nonisolated static func download(_ urlString: String) async throws -> Data {
+    private nonisolated static func download(_ urlString: String, maxBytes: Int,
+                                             directory: Bool = false) async throws -> Data {
         guard let url = URL(string: urlString) else { throw SteamError.chunkDownloadFailed("Invalid content URL.") }
-        let (data, response) = try await http.data(from: url)
+        guard ContentDownloadGuard.permits(url, directory: directory) else {
+            throw SteamError.chunkDownloadFailed("Content URL has an unapproved origin.")
+        }
+        let guardDelegate = ContentDownloadGuard(maxBytes: maxBytes, directory: directory, originalURL: url)
+        let (temporary, response) = try await http.download(from: url, delegate: guardDelegate)
+        defer { try? FileManager.default.removeItem(at: temporary) }
         guard let status = (response as? HTTPURLResponse)?.statusCode, (200...299).contains(status) else {
             throw SteamError.chunkDownloadFailed("Content server returned HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0).")
         }
-        return data
+        let size = try temporary.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? -1
+        guard size >= 0, size <= maxBytes else {
+            throw SteamError.chunkDownloadFailed("Content response exceeds its size limit.")
+        }
+        return try Data(contentsOf: temporary)
     }
 
     // MARK: - Manifest
@@ -570,7 +567,8 @@ final class DepotDownloader {
             let auth = await cdnAuthFragment(depotID: depotID, appID: appID, host: host)
             let code = requestCode == 0 ? "" : "/\(requestCode)"
             do {
-                let raw = try await Self.download("\(host)/depot/\(depotID)/manifest/\(manifestGID)/5\(code)\(auth)")
+                let raw = try await Self.download("\(host)/depot/\(depotID)/manifest/\(manifestGID)/5\(code)\(auth)",
+                                                  maxBytes: 64 << 20)
                 let cache = depotCache
                 return try await Task.detached(priority: .userInitiated) {
                     let (manifest, payload) = try Self.parseManifestKeepingPayload(raw, depotID: depotID, manifestGID: manifestGID, key: key)
@@ -632,7 +630,8 @@ final class DepotDownloader {
         let nameLen = u16(26), extraLen = u16(28)
         let start = 30 + nameLen + extraLen
         guard start + compSize <= data.count, method == 0 || method == 8,
-              uncompSize <= ContentDecryptor.maximumChunkBytes * 4 else {
+              uncompSize <= ContentDecryptor.maximumChunkBytes,
+              method != 0 || compSize == uncompSize else {
             throw SteamError.manifestFetchFailed("Bad zip entry (method \(method))")
         }
         let entry = data.subdata(in: start..<(start + compSize))
@@ -746,10 +745,7 @@ final class DepotDownloader {
             guard let url = URL(string: "https://api.steampowered.com/IContentServerDirectoryService/GetServersForSteamPipe/v1/?cell_id=\(session.cellID)&max_servers=20") else {
                 throw SteamError.chunkDownloadFailed("Bad content directory URL")
             }
-            let (data, response) = try await Self.http.data(from: url)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                throw SteamError.chunkDownloadFailed("Content directory HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-            }
+            let data = try await Self.download(url.absoluteString, maxBytes: 1 << 20, directory: true)
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let resp = json["response"] as? [String: Any],
                   let servers = resp["servers"] as? [[String: Any]] else {
@@ -783,10 +779,14 @@ final class DepotDownloader {
     }
 
     nonisolated static func usableContentHost(_ host: String) -> Bool {
-        guard host.contains("."), !host.contains(" "), !host.contains("/"), !host.contains("*"),
-              !host.contains("lancache"), !host.contains(":") else { return false }
-        return host.hasSuffix(".steamcontent.com") || host.hasSuffix(".akamaized.net") ||
-            host.hasSuffix(".steampipe.steamcontent.com") || host.hasSuffix(".steamstatic.com")
+        let lower = host.lowercased()
+        guard lower.count <= 253, !lower.contains("lancache"),
+              lower.utf8.allSatisfy({ (0x61...0x7a).contains($0) || (0x30...0x39).contains($0) || $0 == 0x2d || $0 == 0x2e }) else { return false }
+        let labels = lower.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 3, labels.allSatisfy({ !$0.isEmpty && $0.count <= 63 &&
+            $0.first != "-" && $0.last != "-" }) else { return false }
+        return lower.hasSuffix(".steamcontent.com") || lower.hasSuffix(".akamaized.net") ||
+            lower.hasSuffix(".steamstatic.com")
     }
 
     /// Unified-service GetCDNAuthToken → "?auth=…" query fragment for this
@@ -825,6 +825,155 @@ final class DepotDownloader {
             return ""
         }
     }
+}
+
+/// Walks an installation tree from a held directory descriptor. `openat` and
+/// `O_NOFOLLOW` make each open reject a pre-existing symlink, including links
+/// substituted between preparation and a later chunk write.
+final class SecureInstallDirectory: @unchecked Sendable {
+    let url: URL
+    let fd: Int32
+
+    init(root: URL, components: [String]) throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var current = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard current >= 0 else { throw SteamError.chunkDownloadFailed("Cannot open the Steam library safely (errno \(errno)).") }
+        var built = root
+        for part in components {
+            guard !part.isEmpty, part != ".", part != "..", !part.contains("/") else {
+                close(current)
+                throw SteamError.chunkDownloadFailed("Invalid install directory component")
+            }
+            if mkdirat(current, part, 0o755) != 0 && errno != EEXIST {
+                let code = errno; close(current)
+                throw SteamError.chunkDownloadFailed("Cannot create install directory (errno \(code)).")
+            }
+            let next = openat(current, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+            let code = errno
+            close(current)
+            guard next >= 0 else { throw SteamError.chunkDownloadFailed("Unsafe install directory (errno \(code)).") }
+            current = next
+            built.appendPathComponent(part, isDirectory: true)
+        }
+        url = built
+        fd = current
+    }
+
+    deinit { close(fd) }
+
+    private func parent(_ relative: String, create: Bool) throws -> (Int32, String) {
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\\") }) else {
+            throw SteamError.chunkDownloadFailed("Unsafe install path")
+        }
+        var current = dup(fd)
+        guard current >= 0 else { throw SteamError.chunkDownloadFailed("Cannot open install directory (errno \(errno)).") }
+        for part in parts.dropLast() {
+            if create && mkdirat(current, part, 0o755) != 0 && errno != EEXIST {
+                let code = errno; close(current)
+                throw SteamError.chunkDownloadFailed("Cannot create game directory (errno \(code)).")
+            }
+            let next = openat(current, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+            let code = errno
+            close(current)
+            guard next >= 0 else { throw SteamError.chunkDownloadFailed("Unsafe game directory (errno \(code)).") }
+            current = next
+        }
+        return (current, parts[parts.count - 1])
+    }
+
+    func ensureDirectory(_ relative: String) throws {
+        let (parentFD, name) = try parent(relative, create: true)
+        defer { close(parentFD) }
+        if mkdirat(parentFD, name, 0o755) != 0 && errno != EEXIST {
+            throw SteamError.chunkDownloadFailed("Cannot create game directory (errno \(errno)).")
+        }
+        let child = openat(parentFD, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard child >= 0 else { throw SteamError.chunkDownloadFailed("Unsafe game directory (errno \(errno)).") }
+        close(child)
+    }
+
+    func openFile(_ relative: String, flags: Int32, createParents: Bool = false) throws -> Int32 {
+        let (parentFD, name) = try parent(relative, create: createParents)
+        defer { close(parentFD) }
+        let file = openat(parentFD, name, flags | O_NOFOLLOW, 0o644)
+        guard file >= 0 else { throw SteamError.chunkDownloadFailed("Cannot open game file safely (errno \(errno)).") }
+        var info = stat()
+        guard fstat(file, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_nlink == 1 else {
+            close(file)
+            throw SteamError.chunkDownloadFailed("Game file is a link or is not regular")
+        }
+        return file
+    }
+
+    func sizeFile(_ relative: String, to size: UInt64) throws -> UInt64 {
+        guard size <= DepotManifest.maxFileSize, size <= UInt64(Int64.max) else {
+            throw SteamError.chunkDownloadFailed("Manifest file size exceeds limit")
+        }
+        let file = try openFile(relative, flags: O_WRONLY | O_CREAT, createParents: true)
+        defer { close(file) }
+        var info = stat()
+        guard fstat(file, &info) == 0, info.st_size >= 0 else {
+            throw SteamError.chunkDownloadFailed("Cannot inspect game file")
+        }
+        let before = UInt64(info.st_size)
+        if size == 0 && before > 0 {
+            throw SteamError.manifestFetchFailed("Refusing to erase an existing game file with an empty manifest entry")
+        }
+        if before != size && ftruncate(file, off_t(size)) != 0 {
+            throw SteamError.chunkDownloadFailed("Cannot size a game file (errno \(errno)).")
+        }
+        return before
+    }
+}
+
+/// Keeps CDN transfers off the heap until their size and final origin are checked.
+/// A fresh delegate belongs to each download task, so concurrent chunk limits do
+/// not share mutable counters. Loopback HTTP is reserved for the host fixture.
+private final class ContentDownloadGuard: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    let maxBytes: Int64
+    let directory: Bool
+    let originalURL: URL
+
+    init(maxBytes: Int, directory: Bool, originalURL: URL) {
+        self.maxBytes = Int64(maxBytes)
+        self.directory = directory
+        self.originalURL = originalURL
+    }
+
+    static func permits(_ url: URL, directory: Bool, originalURL: URL? = nil) -> Bool {
+        guard url.user == nil, url.password == nil, url.fragment == nil,
+              let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return false }
+        if directory { return scheme == "https" && host == "api.steampowered.com" && url.port == nil }
+        if scheme == "https" && url.port == nil && DepotDownloader.usableContentHost(host) { return true }
+        let loopback = host == "127.0.0.1" || host == "localhost" || host == "::1"
+        guard scheme == "http", loopback else { return false }
+        guard let originalURL else { return true }
+        return originalURL.scheme?.lowercased() == scheme && originalURL.host?.lowercased() == host &&
+            originalURL.port == url.port
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        guard let target = request.url,
+              Self.permits(target, directory: directory, originalURL: originalURL) else {
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64) {
+        if totalBytesWritten > maxBytes || totalBytesExpectedToWrite > maxBytes {
+            downloadTask.cancel()
+        }
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) {}
 }
 
 /// Per-install content-server health. Chunks start on different servers
@@ -871,11 +1020,9 @@ final class JournalWriter {
     private var buffer = ""
     private var pending = 0
 
-    init(url: URL) throws {
-        if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-        }
-        handle = try FileHandle(forUpdating: url)
+    init(url: URL, root: SecureInstallDirectory) throws {
+        let descriptor = try root.openFile(url.lastPathComponent, flags: O_RDWR | O_CREAT)
+        handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         // A previous attempt killed mid-write can leave a partial last line;
         // start on a fresh line so the first new key is not glued onto it.
         let end = handle.seekToEndOfFile()
@@ -903,8 +1050,16 @@ final class JournalWriter {
         try? handle.close()
     }
 
-    static func load(_ url: URL) -> Set<UInt64> {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+    static func load(_ url: URL, root: SecureInstallDirectory) -> Set<UInt64> {
+        guard let descriptor = try? root.openFile(url.lastPathComponent, flags: O_RDONLY) else { return [] }
+        let reader = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        defer { try? reader.close() }
+        // A corrupted or substituted journal is not allowed to consume memory
+        // proportional to an untrusted file on an external drive.
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_size >= 0, info.st_size <= 16 << 20,
+              let data = try? reader.readToEnd(),
+              let text = String(data: data, encoding: .utf8) else { return [] }
         var keys = Set<UInt64>()
         for line in text.split(separator: "\n") { if let key = UInt64(line, radix: 16) { keys.insert(key) } }
         return keys

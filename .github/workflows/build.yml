@@ -59,6 +59,10 @@ jobs:
       - name: Check Steam connection recovery
         if: hashFiles('tests/host/check-steam-cm-transport.py') != ''
         run: python3 tests/host/check-steam-cm-transport.py
+      - name: Check Steam content safety and local download fixture
+        run: |
+          brew install zstd
+          python3 tests/host/check-steam-library.py
       - id: sdk
         run: bash tools/build/ci-input-key.sh
 
