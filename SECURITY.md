@@ -3,7 +3,8 @@
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
 atribuciones. **Sólo se permite una compilación de auditoría aislada en GitHub
-Actions, sin cuentas ni secretos personales y sin publicar el IPA. Todavía no
+Actions, sin cuentas ni secretos personales. El artefacto de auditoría contiene
+únicamente un IPA cifrado para la clave guardada fuera del repositorio. Todavía no
 está aprobada para instalar ni usar con cuentas personales.** Una revisión de
 código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
 
@@ -29,8 +30,9 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
   también tienen firma válida de Microsoft y SHA-256 individuales fijados en
   `tools/build/vc-redist-x64.sha256`.
 - GitHub Actions sólo inicia la compilación manualmente. `audit_build=true`
-  permite una prueba aislada en el repositorio público y suprime la publicación
-  del IPA; sin ese modo, el trabajo de seguridad exige
+  permite una prueba aislada en el repositorio público y publica únicamente un
+  IPA cifrado con age. La clave privada de descifrado queda en la PC del usuario;
+  sin ese modo, el trabajo de seguridad exige
   `SECURITY_BUILD_APPROVED=true`. Este valor debe activarse únicamente después
   de completar la lista de controles.
 - Las acciones de checkout, caché y artefactos del flujo están fijadas a
@@ -76,9 +78,12 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
    aislado. Las acciones de GitHub y las herramientas Python de Mesa D3D12
    ya están fijadas, pero otros gestores de paquetes y archivos descargados
    aún requieren revisión.
-4. Autenticar el manifiesto de Steam y comprobar las rutas reales de escritura,
-   incluidos enlaces simbólicos existentes. Validar los nuevos límites de
-   tamaño con manifiestos de prueba en macOS.
+4. Autenticar criptográficamente el manifiesto de Steam. El parser ya exige
+   identidad de depot/GID, estructura y cobertura de chunks; las rutas de
+   escritura y enlaces simbólicos se ejercitaron con una prueba aislada en
+   macOS. La prueba también rechaza un diario falsificado y comprueba que una
+   actualización fallida no trunque un archivo existente. Esto no sustituye
+   la autenticidad criptográfica del manifiesto.
 5. Cifrar y autenticar el transporte de Metal remoto en `dxmt` y en su
    prototipo antes de exponerlo en una red; el lanzador de prueba ahora usa
    loopback por defecto, pero el cliente de la app aún usa TCP sin cifrar

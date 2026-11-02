@@ -2,12 +2,12 @@ name: Build IPA
 
 on:
   # This build fetches and packages executable dependencies. Audit mode runs
-  # without personal credentials and does not publish the IPA. The VC redist
-  # digest is pinned in the recipe.
+  # without personal credentials. It publishes only an encrypted IPA artifact;
+  # the decryption key remains on the user's PC. The VC redist digest is pinned.
   workflow_dispatch:
     inputs:
       audit_build:
-        description: 'Build for isolated CI inspection without publishing the IPA'
+        description: 'Build for isolated CI inspection with an encrypted IPA artifact'
         required: true
         type: boolean
         default: false
@@ -392,11 +392,23 @@ jobs:
           merge-multiple: true
       - name: Build IPA
         run: tools/build-ipa.sh
-      - name: Record isolated build result
+      - name: Verify and encrypt isolated IPA
         if: ${{ inputs.audit_build }}
         run: |
           shasum -a 256 dist/Madeira.ipa
           unzip -t dist/Madeira.ipa | tail -n 1
+          brew install age
+          age -R .github/ipa-audit-recipient.txt -o dist/GalacWin.ipa.age dist/Madeira.ipa
+          shasum -a 256 dist/GalacWin.ipa.age
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ inputs.audit_build }}
+        with:
+          name: GalacWin-audit-ipa-encrypted
+          path: dist/GalacWin.ipa.age
+          if-no-files-found: error
+          overwrite: true
+          compression-level: 0
+          retention-days: 1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !inputs.audit_build }}
         with:
