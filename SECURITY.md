@@ -14,6 +14,12 @@ Wi-Fi hasta la biblioteca, sin avisos ni permisos solicitados. JIT, juegos y
 uso con cuentas personales siguen sin validarse.** Una revisión de
 código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
 
+En una apertura separada de varios minutos en la biblioteca con Wi-Fi, sin
+cuentas ni descargas, el usuario activó el Informe de privacidad de las apps
+de iPadOS. GalacWin apareció allí sin dominios registrados. Esto sólo describe
+lo que mostró ese informe en esa prueba; no es una captura completa del tráfico
+ni demuestra ausencia de código malicioso.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`
