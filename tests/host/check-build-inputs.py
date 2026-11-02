@@ -87,10 +87,12 @@ with tempfile.TemporaryDirectory(prefix='madeira-build-inputs-') as folder:
                                   cwd=root, env=dict(env, **{name: 'wrong'}), capture_output=True)
         assert mismatch.returncode != 0, 'a mismatched runner must not publish under the planned key'
 
-assert workflow.count('name: Madeira-ipa') == 1
+assert workflow.count('name: GalacWin-ipa') == 1
 assert 'run: tools/build-ipa.sh' in workflow
 assert 'runtime-components.py" ipa "$DIST/Madeira.ipa"' in (root / 'tools/build/package-ipa.sh').read_text()
 app_workflow = workflow.split('\n  app:\n', 1)[1]
+assert 'if: ${{ !inputs.audit_build }}' in app_workflow, 'audit builds must not publish the IPA'
+assert 'if: ${{ inputs.audit_build }}' in app_workflow, 'audit builds must record IPA integrity'
 assert 'fail-on-cache-miss: true' not in app_workflow, 'native cache transfer must allow a rebuild'
 fallback = re.search(r'      - name: Rebuild missing 32-bit DLLs\n'
                      r"        if: steps.cache-i386.outputs.cache-hit != 'true' && steps.transfer-i386.outcome != 'success'\n"
