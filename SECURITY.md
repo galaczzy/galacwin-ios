@@ -27,6 +27,15 @@ compiló el ayudante con Xcode y terminó correctamente. Esta ejecución no cre�
 un IPA, y el IPA de auditoría instalado proviene de un commit anterior. La
 dependencia `idevice` precompilada de StikJIT aún requiere revisión.
 
+La [compilación de auditoría v2 #41405450209](https://github.com/galaczzy/galacwin-ios/actions/runs/41405450209)
+del commit `37f8060853b30f3dbd6b2a187e3d275c2aba47aa` terminó correctamente.
+El nuevo IPA incorpora la comprobación DDI y su SHA-256 coincide con el que
+registró el runner antes del cifrado. El verificador independiente pasó todas
+sus comprobaciones. ClamAV 1.5.4 con la base `daily` 28172 examinó 1.11 GiB:
+la pasada de malware terminó `OK` y la pasada PUA con búsqueda de todas las
+coincidencias marcó sólo el `kernel32.dll` de Wine con la misma firma anterior.
+**El IPA v2 aún no se ha probado en el iPad y JIT sigue sin aprobarse.**
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`
@@ -94,8 +103,8 @@ dependencia `idevice` precompilada de StikJIT aún requiere revisión.
    de StikJIT. La coincidencia con su ZIP oficial establece el origen del
    framework, pero no demuestra ausencia de malware. La etiqueta 1.9.0 de
    StikJIT enlaza un archivo `idevice` ya compilado. El código actual llena y
-   verifica la caché DDI antes de invocar StikJIT, pero aún se debe validar esa
-   protección en un IPA nuevo y en el dispositivo; véanse
+   verifica la caché DDI antes de invocar StikJIT. El IPA v2 incorpora esa
+   protección, pero aún se debe validar en el dispositivo; véanse
    [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md) y
    [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). El inventario
    `security/upstream-binaries.csv` sólo registra hashes de la copia.
