@@ -31,7 +31,7 @@ jobs:
           export IPHONEOS_DEPLOYMENT_TARGET=17.0
           export CARGO_PROFILE_RELEASE_LTO=false
           cd .jit-source/idevice/ffi
-          cargo +1.99.0 build --locked --release --target aarch64-apple-ios --no-default-features --features full,rustcrypto,obfuscate
+          cargo +1.99.0 build --locked --release --target aarch64-apple-ios --no-default-features --features full,rustcrypto
           test -s ../target/aarch64-apple-ios/release/libidevice_ffi.a
           test -s idevice.h
           shasum -a 256 ../target/aarch64-apple-ios/release/libidevice_ffi.a idevice.h
@@ -50,6 +50,13 @@ jobs:
             -framework build/StikJIT.xcarchive/Products/Library/Frameworks/StikJIT.framework \
             -output StikJIT.xcframework
           shasum -a 256 StikJIT.xcframework/ios-arm64/StikJIT.framework/StikJIT
+      - name: Compile GalacWin helper against rebuilt StikJIT
+        run: |
+          mv app/Frameworks/StikJIT.xcframework .jit-source/vendored-StikJIT.xcframework
+          ditto .jit-source/StikJIT/StikJIT.xcframework app/Frameworks/StikJIT.xcframework
+          xcodebuild -project app/Madeira.xcodeproj \
+            -target MadeiraJITHelper -configuration Debug -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: StikJIT-source-build-check
