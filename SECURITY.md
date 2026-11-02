@@ -1,5 +1,15 @@
 # Estado de seguridad de esta versión
 
+La siguiente revisión de código, todavía sin IPA instalado, limita a 1 MiB la
+lectura de archivos de emparejamiento y del traspaso de la cuenta de firma.
+El helper JIT protege su copia temporal con la clase de protección completa de
+iPadOS y permisos `0600`. Las credenciales de emparejamiento, firma, Steam y
+Epic se actualizan en el llavero sin borrar antes la entrada anterior: un error
+de guardado ya no debe destruir la credencial válida. Las comprobaciones
+estáticas de emparejamiento y firma pasan en Windows; la compilación con Xcode,
+el IPA y el comportamiento en el iPad de esta revisión aún no se han validado.
+El IPA v5 instalado sigue siendo el resultado probado más reciente.
+
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
 atribuciones. **El IPA de auditoría v5 del commit

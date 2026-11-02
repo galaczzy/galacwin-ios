@@ -102,12 +102,22 @@ enum EpicTokenStore {
 
     @discardableResult static func save(_ session: EpicSession) -> Bool {
         guard let data = try? JSONEncoder().encode(session) else { return false }
-        delete()
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service, kSecAttrAccount as String: account]
+        let updated = SecItemUpdate(query as CFDictionary,
+                                    [kSecValueData as String: data] as CFDictionary)
+        if updated == errSecSuccess { return true }
+        guard updated == errSecItemNotFound else { return false }
         let item: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                    kSecAttrAccount as String: account, kSecValueData as String: data,
                                    kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
                                    kSecAttrSynchronizable as String: false]
-        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
+        let added = SecItemAdd(item as CFDictionary, nil)
+        if added == errSecDuplicateItem {
+            return SecItemUpdate(query as CFDictionary,
+                                 [kSecValueData as String: data] as CFDictionary) == errSecSuccess
+        }
+        return added == errSecSuccess
     }
 
     static func delete() {

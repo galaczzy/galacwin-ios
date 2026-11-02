@@ -90,18 +90,25 @@ require('JITPairingFileStore.store(data, source: .onDevice)' in store and 'metho
 # The pairing file is a credential for the device: Keychain, this device only, never Documents.
 pstore = setup[setup.index('enum JITPairingFileStore {'):setup.index('final class JITCoordinator')]
 require('SecItemAdd(add as CFDictionary, nil)' in pstore
+        and 'SecItemUpdate(item as CFDictionary' in pstore
+        and 'SecItemDelete(item as CFDictionary)' not in pstore
         and 'kSecAttrAccessibleWhenUnlockedThisDeviceOnly' in pstore
         and 'SecItemCopyMatching(' in pstore,
-        'the pairing file is kept in the Keychain, this device only, readable while unlocked')
+        'the pairing file is kept in the Keychain, this device only, without deleting the old credential first')
 require('data.write(' not in pstore and pstore.count('.documentDirectory') == 1
         and 'private static var legacyFolder' in pstore,
         'the pairing file is never written to Documents (only the old copy is read there)')
 legacy = block(setup, 'private static func moveLegacyFile(')
 require(legacy.index('try? store(data, source: kept)') < legacy.index('removeItem(at: file)'),
         'an old Documents copy is deleted only after the Keychain holds it')
-require('try store(try Data(contentsOf: source), source: .imported)' in setup
+require('try store(try readPairingFile(at: source), source: .imported)' in setup
+        and 'let data = try? readPairingFile(at: file)' in pstore
+        and 'data.count <= maximumFileSize' in pstore
         and 'dictionary["public_key"]' in block(setup, 'static func store('),
-        'imports and on-device pairings share one validation')
+        'imports and on-device pairings share bounded reading and validation')
+require('pairingData.count <= MadeiraJITRequest.maximumPairingFileSize' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text()
+        and '.completeFileProtection' in (root / 'app/MadeiraJITHelper/MadeiraJITHelper.swift').read_text(),
+        'the helper bounds and protects the temporary pairing file')
 require('OnDevicePairing.shared.cancel()' in block(setup, 'func importPairingFile('),
         'an import stops a waiting on-device pairing, so it cannot overwrite the import')
 for line in pairing.splitlines():

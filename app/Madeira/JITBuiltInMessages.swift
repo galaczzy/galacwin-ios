@@ -7,6 +7,7 @@ import Foundation
 /// in an extension request's item (userInfo[itemKey]), to the helper and back.
 struct MadeiraJITRequest: Codable, Sendable {
     static let itemKey = "madeira-jit-request"
+    static let maximumPairingFileSize = 1_048_576
 
     enum Operation: String, Codable, Sendable {
         case prepare

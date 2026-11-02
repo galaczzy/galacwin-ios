@@ -37,19 +37,24 @@ class SteamTokenStore {
             return
         }
 
-        // Delete existing entry first
-        deleteKeychainItem()
-
-        // Add new entry
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "steam_tokens",
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrAccount as String: "steam_tokens"
         ]
-
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let updated = SecItemUpdate(query as CFDictionary,
+                                    [kSecValueData as String: data] as CFDictionary)
+        var status = updated
+        if updated == errSecItemNotFound {
+            var add = query
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            status = SecItemAdd(add as CFDictionary, nil)
+            if status == errSecDuplicateItem {
+                status = SecItemUpdate(query as CFDictionary,
+                                       [kSecValueData as String: data] as CFDictionary)
+            }
+        }
         if status == errSecSuccess {
             SteamLog.trace("Tokens saved to Keychain")
         } else {

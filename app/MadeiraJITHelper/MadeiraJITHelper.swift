@@ -172,13 +172,15 @@ private enum MadeiraJITWork {
                              txmPresent: StikJIT.isTXMPresent)
             }
 
-            guard let pairingData = request.pairingData, !pairingData.isEmpty else {
+            guard let pairingData = request.pairingData, !pairingData.isEmpty,
+                  pairingData.count <= MadeiraJITRequest.maximumPairingFileSize else {
                 throw NSError(domain: "MadeiraJITHelper", code: 1,
                               userInfo: [NSLocalizedDescriptionKey: "The pairing file was not provided."])
             }
             let pairingURL = root.appendingPathComponent("pairingFile-\(UUID().uuidString).plist")
-            try pairingData.write(to: pairingURL, options: .atomic)
+            try pairingData.write(to: pairingURL, options: [.atomic, .completeFileProtection])
             defer { try? manager.removeItem(at: pairingURL) }
+            try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: pairingURL.path)
 
             switch request.operation {
             case .prepare:

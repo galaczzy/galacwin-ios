@@ -41,6 +41,7 @@ enum JITPairingFileStore {
     private static let service = "MadeiraJITPairing"
     private static let account = "rppairing"
     private static let sourceKey = "madeiraJITPairingSource"
+    static let maximumFileSize = MadeiraJITRequest.maximumPairingFileSize
 
     static var isImported: Bool { (try? data()) != nil }
 
@@ -60,7 +61,8 @@ enum JITPairingFileStore {
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ] as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data, !data.isEmpty else {
+        guard status == errSecSuccess, let data = result as? Data,
+              !data.isEmpty, data.count <= maximumFileSize else {
             throw NSError(domain: "MadeiraJIT", code: 11,
                           userInfo: [NSLocalizedDescriptionKey: "No pairing file is stored for this device."])
         }
@@ -70,12 +72,30 @@ enum JITPairingFileStore {
     static func importFile(from source: URL) throws {
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
-        try store(try Data(contentsOf: source), source: .imported)
+        try store(try readPairingFile(at: source), source: .imported)
+    }
+
+    /// Read only a bounded amount, even if a file provider or a legacy file lies
+    /// about its size. The extra byte distinguishes a full valid file from an
+    /// oversized one without loading the rest into memory.
+    private static func readPairingFile(at url: URL) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var data = Data()
+        while let chunk = try handle.read(upToCount: min(65_536, maximumFileSize + 1 - data.count)),
+              !chunk.isEmpty {
+            data.append(chunk)
+            guard data.count <= maximumFileSize else {
+                throw NSError(domain: "MadeiraJIT", code: 13,
+                              userInfo: [NSLocalizedDescriptionKey: "The pairing file is too large."])
+            }
+        }
+        return data
     }
 
     /// Validates an RPPairing plist and makes it the pairing file.
     static func store(_ data: Data, source: JITPairingSource) throws {
-        guard !data.isEmpty,
+        guard !data.isEmpty, data.count <= maximumFileSize,
               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
               let dictionary = plist as? [String: Any],
               let publicKey = dictionary["public_key"] as? Data, publicKey.count == 32,
@@ -90,11 +110,19 @@ enum JITPairingFileStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        SecItemDelete(item as CFDictionary)
-        var add = item
-        add[kSecValueData as String] = data
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        let status = SecItemAdd(add as CFDictionary, nil)
+        let updated = SecItemUpdate(item as CFDictionary,
+                                    [kSecValueData as String: data] as CFDictionary)
+        var status = updated
+        if updated == errSecItemNotFound {
+            var add = item
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            status = SecItemAdd(add as CFDictionary, nil)
+            if status == errSecDuplicateItem {
+                status = SecItemUpdate(item as CFDictionary,
+                                       [kSecValueData as String: data] as CFDictionary)
+            }
+        }
         guard status == errSecSuccess else {
             throw NSError(domain: "MadeiraJIT", code: 12,
                           userInfo: [NSLocalizedDescriptionKey:
@@ -113,7 +141,8 @@ enum JITPairingFileStore {
     private static func moveLegacyFile() {
         let manager = FileManager.default
         let file = legacyFolder.appendingPathComponent("pairingFile.plist")
-        guard manager.fileExists(atPath: file.path), let data = try? Data(contentsOf: file) else { return }
+        guard manager.fileExists(atPath: file.path),
+              let data = try? readPairingFile(at: file) else { return }
         let kept = UserDefaults.standard.string(forKey: sourceKey).flatMap(JITPairingSource.init(rawValue:)) ?? .imported
         // Deleted only once the Keychain holds it (a locked device keeps it for later).
         if (try? store(data, source: kept)) != nil {

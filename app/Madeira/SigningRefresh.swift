@@ -160,6 +160,7 @@ enum SigningAccountStore {
     private static let service = "MadeiraSigningAccount"
     private static let keychainAccount = "developer-portal"
     private static let refusedKey = "madeiraSigningAccountRefused"
+    private static let maximumHandoffSize = 1_048_576
 
     private static var item: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -193,11 +194,19 @@ enum SigningAccountStore {
     @discardableResult
     static func store(_ account: SigningAccount) -> Bool {
         guard account.usable, let data = try? PropertyListEncoder().encode(account) else { return false }
-        SecItemDelete(item as CFDictionary)
+        let updated = SecItemUpdate(item as CFDictionary,
+                                    [kSecValueData as String: data] as CFDictionary)
+        if updated == errSecSuccess { return true }
+        guard updated == errSecItemNotFound else { return false }
         var add = item
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        let added = SecItemAdd(add as CFDictionary, nil)
+        if added == errSecDuplicateItem {
+            return SecItemUpdate(item as CFDictionary,
+                                 [kSecValueData as String: data] as CFDictionary) == errSecSuccess
+        }
+        return added == errSecSuccess
     }
 
     static func forget() {
@@ -205,12 +214,27 @@ enum SigningAccountStore {
         refused = false
     }
 
+    private static func readHandoff() throws -> Data {
+        let handle = try FileHandle(forReadingFrom: handoff)
+        defer { try? handle.close() }
+        var data = Data()
+        while let chunk = try handle.read(upToCount: min(65_536, maximumHandoffSize + 1 - data.count)),
+              !chunk.isEmpty {
+            data.append(chunk)
+            guard data.count <= maximumHandoffSize else {
+                throw NSError(domain: "MadeiraSigning", code: 13,
+                              userInfo: [NSLocalizedDescriptionKey: "The sign-in handoff is too large."])
+            }
+        }
+        return data
+    }
+
     /// Moves a sign-in an installer left into the Keychain. The file goes once the
     /// Keychain holds it, or at once when it is not one Madeira can use.
     static func takeIn() {
         let manager = FileManager.default
         guard manager.fileExists(atPath: handoff.path) else { return }
-        guard let data = try? Data(contentsOf: handoff),
+        guard let data = try? readHandoff(),
               let account = try? PropertyListDecoder().decode(SigningAccount.self, from: data), account.usable else {
             try? manager.removeItem(at: handoff)
             LogStore.shared.log("[signing] a sign-in was left for Madeira that it cannot read; removed", level: .error)
