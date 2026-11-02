@@ -20,6 +20,13 @@ de iPadOS. GalacWin apareció allí sin dominios registrados. Esto sólo describ
 lo que mostró ese informe en esa prueba; no es una captura completa del tráfico
 ni demuestra ausencia de código malicioso.
 
+El commit [`e9b54b1`](https://github.com/galaczzy/galacwin-ios/commit/e9b54b1f4784576f94a92505f5429caf9adc9897)
+añadió una comprobación de tamaño y SHA-256 para las imágenes de desarrollo que
+el ayudante JIT entrega a StikJIT. La [ejecución de Actions #41404266066](https://github.com/galaczzy/galacwin-ios/actions/runs/41404266066)
+compiló el ayudante con Xcode y terminó correctamente. Esta ejecución no creó
+un IPA, y el IPA de auditoría instalado proviene de un commit anterior. La
+dependencia `idevice` precompilada de StikJIT aún requiere revisión.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`
@@ -67,6 +74,10 @@ ni demuestra ausencia de código malicioso.
 - Los diez blobs Git del framework StikJIT coinciden byte por byte con el ZIP
   publicado por StikDebug para la versión 1.9.0; véase
   [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md).
+- El ayudante JIT del código actual sólo entrega a StikJIT imágenes DDI cuyo
+  tamaño y SHA-256 coinciden con un conjunto fijado a un commit concreto;
+  véase [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). Esto todavía
+  no está presente en el IPA de auditoría descrito abajo.
 - El prefijo Wine incluido ya no contiene `chcp.com` ni el instalador MSI. Se
   verificó que las otras 136 entradas conservaran su contenido y metadatos;
   el compilador exige su SHA-256 aprobado y rechaza rutas, enlaces y tipos de
@@ -82,9 +93,11 @@ ni demuestra ausencia de código malicioso.
    los archivos restantes del prefijo comprimido, y reconstruir o auditar el código fuente
    de StikJIT. La coincidencia con su ZIP oficial establece el origen del
    framework, pero no demuestra ausencia de malware. La etiqueta 1.9.0 de
-   StikJIT enlaza un archivo `idevice` ya compilado y descarga imágenes DDI
-   desde una rama mutable sin hashes fijados; véase
-   [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md). El inventario
+   StikJIT enlaza un archivo `idevice` ya compilado. El código actual llena y
+   verifica la caché DDI antes de invocar StikJIT, pero aún se debe validar esa
+   protección en un IPA nuevo y en el dispositivo; véanse
+   [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md) y
+   [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). El inventario
    `security/upstream-binaries.csv` sólo registra hashes de la copia.
 3. Revisar las demás descargas de CI y validar el flujo completo en un runner
    aislado. Las acciones de GitHub y las herramientas Python de Mesa D3D12
