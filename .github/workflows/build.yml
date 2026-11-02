@@ -390,6 +390,8 @@ jobs:
           pattern: runtime-*
           path: .runtime-cache
           merge-multiple: true
+      - name: Rebuild StikJIT and idevice from pinned source
+        run: bash tools/build/build-stikjit-source.sh
       - name: Build IPA
         run: tools/build-ipa.sh
       - name: Verify and encrypt isolated IPA

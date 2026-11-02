@@ -16,44 +16,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Fetch exact upstream source revisions
-        run: |
-          mkdir -p .jit-source
-          git clone --depth 1 --branch v0.1.68 https://github.com/jkcoxson/idevice.git .jit-source/idevice
-          test "$(git -C .jit-source/idevice rev-parse HEAD)" = d32c8189c51c2789496b0768039419c3705498c3
-          git clone --depth 1 --branch 1.9.0 https://github.com/StikDebug/StikJIT.git .jit-source/StikJIT
-          test "$(git -C .jit-source/StikJIT rev-parse HEAD)" = 32287268fa5824f9edce4cb359f5833ce0cf7b00
-          test "$(shasum -a 256 .jit-source/StikJIT/idevice/libidevice_ffi.a | cut -d' ' -f1)" = 4db23fe1d342927b9480bb9a8577f219994365621dc28aa0018e23ea1990ecc8
-      - name: Build idevice FFI from locked Rust source
-        run: |
-          rustup toolchain install 1.99.0 --profile minimal --target aarch64-apple-ios
-          export SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
-          export IPHONEOS_DEPLOYMENT_TARGET=17.0
-          export CARGO_PROFILE_RELEASE_LTO=false
-          cd .jit-source/idevice/ffi
-          cargo +1.99.0 build --locked --release --target aarch64-apple-ios --no-default-features --features full,rustcrypto
-          test -s ../target/aarch64-apple-ios/release/libidevice_ffi.a
-          test -s idevice.h
-          shasum -a 256 ../target/aarch64-apple-ios/release/libidevice_ffi.a idevice.h
-      - name: Compile StikJIT with reconstructed idevice
-        run: |
-          cp .jit-source/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a .jit-source/StikJIT/idevice/libidevice_ffi.a
-          cp .jit-source/idevice/ffi/idevice.h .jit-source/StikJIT/idevice/idevice.h
-          test "$(shasum -a 256 .jit-source/StikJIT/idevice/libidevice_ffi.a | cut -d' ' -f1)" != 4db23fe1d342927b9480bb9a8577f219994365621dc28aa0018e23ea1990ecc8
-          command -v xcodegen >/dev/null || brew install xcodegen
-          cd .jit-source/StikJIT
-          xcodegen generate
-          xcodebuild archive -scheme StikJIT -destination 'generic/platform=iOS' \
-            -archivePath build/StikJIT BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-            CODE_SIGNING_ALLOWED=NO
-          xcodebuild -create-xcframework \
-            -framework build/StikJIT.xcarchive/Products/Library/Frameworks/StikJIT.framework \
-            -output StikJIT.xcframework
-          shasum -a 256 StikJIT.xcframework/ios-arm64/StikJIT.framework/StikJIT
+      - name: Rebuild and stage StikJIT
+        run: bash tools/build/build-stikjit-source.sh
       - name: Compile GalacWin helper against rebuilt StikJIT
         run: |
-          mv app/Frameworks/StikJIT.xcframework .jit-source/vendored-StikJIT.xcframework
-          ditto .jit-source/StikJIT/StikJIT.xcframework app/Frameworks/StikJIT.xcframework
           xcodebuild -project app/Madeira.xcodeproj \
             -target MadeiraJITHelper -configuration Debug -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO build

@@ -20,6 +20,7 @@ research/Winlator-Ludashi/
 research/*.md
 
 # Build artifacts
+.jit-source/
 app/build/
 app/DerivedData/
 build/DerivedData/
