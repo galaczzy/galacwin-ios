@@ -1,6 +1,8 @@
 # Estado de seguridad de esta versión
 
-La siguiente revisión de código, todavía sin IPA instalado, limita a 1 MiB la
+El IPA de auditoría v6 del commit
+[`4b5a202`](https://github.com/galaczzy/galacwin-ios/commit/4b5a202fa0efe6f01903965481fbee5083661fa5),
+todavía sin instalar, limita a 1 MiB la
 lectura de archivos de emparejamiento y del traspaso de la cuenta de firma.
 Un archivo de emparejamiento colocado en `Documents` no puede sustituir una
 credencial que ya exista en el llavero; la copia redundante se elimina.
@@ -8,8 +10,15 @@ El helper JIT protege su copia temporal con la clase de protección completa de
 iPadOS y permisos `0600`. Las credenciales de emparejamiento, firma, Steam y
 Epic se actualizan en el llavero sin borrar antes la entrada anterior: un error
 de guardado ya no debe destruir la credencial válida. Las comprobaciones
-estáticas de emparejamiento y firma pasan en Windows; la compilación con Xcode,
-el IPA y el comportamiento en el iPad de esta revisión aún no se han validado.
+estáticas de emparejamiento y firma pasaron en Windows. La
+[compilación #41541676866](https://github.com/galaczzy/galacwin-ios/actions/runs/41541676866)
+terminó correctamente; el verificador del IPA aprobó sus 1 432 entradas y los
+hashes de 577 archivos del runtime. ClamAV 1.5.4 examinó 1,11 GiB: la pasada
+sin PUA terminó `OK` y la pasada PUA señaló sólo la firma ya conocida del
+`kernel32.dll` ARM64EC, idéntico al de v5. El informe local
+`outputs/informe-validacion-GalacWin-v6.md`, fuera del repositorio público,
+contiene los hashes, registros y límites. El comportamiento de v6 en el iPad
+aún no se ha probado.
 El IPA v5 instalado sigue siendo el resultado probado más reciente.
 
 Esta es una derivación local de Madeira, fijada inicialmente al commit
