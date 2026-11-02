@@ -129,8 +129,12 @@ IPA. No se han ejecutado juegos ni instaladores de terceros en esta etapa.
   de memoria y funciones de reloj. El PE importa únicamente `kernelbase.dll`
   y `ntdll.dll`. La [documentación de ClamAV](https://docs.clamav.net/faq/faq-pua.html)
   advierte que sus reglas PUA pueden
-  producir más falsos positivos. Esta alerta concreta parece un falso positivo
-  del formato, pero la evidencia no certifica el resto del IPA.
+  producir más falsos positivos. `sigtool` localizó la regla en el mismo
+  desplazamiento 335796 en los dos DLL: ceros seguidos de `KERNEL32.dll` y
+  nombres de funciones. El DLL reconstruido solo tiene un encabezado `MZ`;
+  los bytes fuera de las secciones PE son símbolos COFF y relleno. Esta alerta
+  PUA concreta se considera un falso positivo con alta confianza, pero la
+  evidencia no certifica el resto del IPA.
 
 ## Evidencia local
 
