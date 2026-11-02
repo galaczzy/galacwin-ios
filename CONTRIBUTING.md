@@ -1,6 +1,9 @@
 # Contributing
 
-Contributions to Madeira are accepted under **GPL-3.0-or-later**. By submitting
+Contributions to GalacWin iOS are accepted under **GPL-3.0-or-later** with the
+same additional permission for Apple libraries described in
+`LICENSE-EXCEPTION.md`, limited to the contributor's own changes. See
+`LICENSE-GALACWIN-EXCEPTION.md` for the maintainer's grant. By submitting
 a change you certify that you wrote it or otherwise have the right to submit it
 under that licence, per the
 [Developer Certificate of Origin](https://developercertificate.org/), and you
@@ -17,10 +20,9 @@ prohibits AI-generated code; see the note in `README.md`.
 
 ## Additional permission for Apple's Metal Shader Converter
 
-Madeira links with Apple's proprietary Metal Shader Converter library and
-Apple system frameworks. Contributions to this repository are accepted under
-GPL-3.0-or-later **with the Madeira Converter Exception, version 1** (the
-additional permission in `LICENSE-EXCEPTION.md`, prepared 2026-09-16 and
-adopted on 2026-09-24, before any public push), so that the combination
-can be conveyed. By submitting a contribution you
-agree that your contribution carries that additional permission too.
+GalacWin links with Apple's proprietary Metal Shader Converter library and
+Apple system frameworks. The original author's "Madeira Converter Exception,
+version 1" in `LICENSE-EXCEPTION.md` applies only within its stated scope.
+By submitting a contribution to this fork you agree that your own
+copyrightable contribution carries the equivalent additional permission too.
+You cannot grant permission for another author's code.

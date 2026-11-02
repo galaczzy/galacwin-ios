@@ -1,5 +1,10 @@
 # Madeira licensing: the assembled iOS app (working document of 2026-09-16, updated 2026-09-24; not legal advice)
 
+GalacWin iOS inherits this upstream working document. Its maintainer's
+additional permission for changes they can license is recorded separately in
+`../LICENSE-GALACWIN-EXCEPTION.md`; it grants nothing for third-party code.
+The open items below still need review before distributing a GalacWin IPA.
+
 This is a working document by the Madeira author, not legal advice. It
 records what the shipped app contains, under which terms, and which
 obligations follow. It must be reviewed by an open-source licensing lawyer

@@ -1,5 +1,10 @@
 # Third-party components
 
+This inherited inventory describes the Madeira code and dependencies from
+which GalacWin iOS is derived. GalacWin's own modifications are covered by
+GPL-3.0-or-later and the maintainer's separate additional permission in
+`LICENSE-GALACWIN-EXCEPTION.md`, only to the extent they can grant it.
+
 Madeira is built from several upstream projects plus original work. Each
 component keeps its own license. This file records what is here, what ships in
 the binary, and what is still unresolved.

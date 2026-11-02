@@ -1,8 +1,11 @@
-Madeira third-party notices (shipped in every built package)
+GalacWin iOS third-party notices (shipped in every built package)
 
-Madeira itself: GPL-3.0-or-later (LICENSE-MADEIRA-GPL-3.0.txt) with the
-Madeira Converter Exception, version 1 (LICENSE-MADEIRA-EXCEPTION.txt),
-which is a DRAFT and not in effect until adopted in a tagged release.
+Original Madeira code: GPL-3.0-or-later (LICENSE-MADEIRA-GPL-3.0.txt) with
+the Madeira Converter Exception, version 1 (LICENSE-MADEIRA-EXCEPTION.txt),
+adopted by Will Faust on 2026-09-24, within its stated scope.
+GalacWin-owned changes: GPL-3.0-or-later with the separate additional
+permission in LICENSE-GALACWIN-EXCEPTION.txt, limited to material for which
+galaczzy can grant copyright permission.
 
 Steam sign-in, owned library and downloads (SwiftSteam): derived from
 Jfishin's Madeira Steam client and used with his permission; GPL-3.0-or-later
