@@ -615,7 +615,7 @@ struct JITSetupView: View {
                 } header: {
                     Text("JIT method")
                 } footer: {
-                    Text("Automatic uses StikDebug when it is installed. Madeira does not silently change methods after a failure.")
+                    Text("Automatic uses StikDebug when it is installed. GalacWin does not silently change methods after a failure.")
                 }
 
                 if coordinator.method != .stikDebug {
@@ -658,7 +658,7 @@ struct JITSetupView: View {
                                  destination: URL(string: "https://github.com/StikDebug/StikDebug/releases/latest")!)
                         }
                     } footer: {
-                        Text("StikDebug needs a pairing file and an active LocalDevVPN connection. Madeira sends its own script automatically.")
+                        Text("StikDebug needs a pairing file and an active LocalDevVPN connection. GalacWin sends its own script automatically.")
                     }
                 }
 

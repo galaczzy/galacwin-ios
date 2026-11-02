@@ -473,7 +473,7 @@ struct LibraryGridPage: View {
         case .notInstalledToggle(let count, _):
             return AnyView(LibraryGridNotInstalledToggle(count: count))
         case .emptyLibrary:
-            return AnyView(ContentUnavailableView("Make yourself at home", systemImage: "gamecontroller", description: Text("Copy a game's folder into Madeira › wine › drive_c with the Files app, then tap + and choose its .exe.")))
+            return AnyView(ContentUnavailableView("Make yourself at home", systemImage: "gamecontroller", description: Text("Copy a game's folder into GalacWin › wine › drive_c with the Files app, then tap + and choose its .exe.")))
         }
     }
 }

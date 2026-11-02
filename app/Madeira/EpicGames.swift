@@ -145,7 +145,7 @@ struct EpicSignInCard: View {
                 Image(systemName: "person.crop.circle.badge.plus").font(.system(size: 30)).foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sign in to Epic Games").font(.headline)
-                    Text("See your Epic Games games here and install them without leaving Madeira.")
+                    Text("See your Epic Games games here and install them without leaving GalacWin.")
                         .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)
@@ -342,7 +342,7 @@ struct EpicGameSheet: View {
                     }
                     Section {
                         if let freeSpace { LabeledContent("Free space on this device", value: ByteCountFormatter.string(fromByteCount: freeSpace, countStyle: .file)) }
-                        Text("Games download directly from Epic with your account into C:\\Program Files\\Epic Games. On iOS 26 and later the download continues in the background, with its progress shown by iOS. On earlier iOS, keep Madeira open while it downloads: in the background iOS allows only a short time, then the download pauses and continues when you return. A download also pauses while a game is running.")
+                        Text("Games download directly from Epic with your account into C:\\Program Files\\Epic Games. On iOS 26 and later the download continues in the background, with its progress shown by iOS. On earlier iOS, keep GalacWin open while it downloads: in the background iOS allows only a short time, then the download pauses and continues when you return. A download also pauses while a game is running.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 } else {
@@ -427,7 +427,7 @@ struct EpicEntrySection: View {
             if let record {
                 LabeledContent("Version", value: record.buildVersion)
                 if !record.canRunOffline {
-                    Text("Epic marks this game as online only: it starts only while Madeira can reach Epic.")
+                    Text("Epic marks this game as online only: it starts only while GalacWin can reach Epic.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -445,7 +445,7 @@ struct EpicEntrySection: View {
         } header: {
             Text("Epic Games")
         } footer: {
-            Text("The game starts its own program in Wine. At every start Madeira asks Epic for a one-use sign-in code and passes it to the game, as Epic's launcher does, so the game signs in to Epic with your account. There is no Epic launcher in Madeira.")
+            Text("The game starts its own program in Wine. At every start GalacWin asks Epic for a one-use sign-in code and passes it to the game, as Epic's launcher does, so the game signs in to Epic with your account. There is no Epic launcher in GalacWin.")
         }
         .confirmationDialog("Uninstall \(entry.title)? Its downloaded files are deleted from this device. Saves stored elsewhere are kept.",
                             isPresented: $confirmUninstall, titleVisibility: .visible) {
@@ -476,7 +476,7 @@ struct EpicSettingsSection: View {
         } header: {
             Text("Epic Games")
         } footer: {
-            Text("Madeira keeps an Epic Games sign-in token in this device's Keychain, for this device only. Signing out removes it; installed games stay.")
+            Text("GalacWin keeps an Epic Games sign-in token in this device's Keychain, for this device only. Signing out removes it; installed games stay.")
         }
         .onAppear { epic.start() }
         .confirmationDialog("Sign out of Epic Games?", isPresented: $confirmSignOut, titleVisibility: .visible) {

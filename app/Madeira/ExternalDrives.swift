@@ -453,7 +453,7 @@ struct ExternalDrivesSection: View {
             }
             if let error { Text(error).foregroundStyle(.red) }
         } header: { Text("External drives") } footer: {
-            Text("Pick a folder on a USB or SSD drive, or a whole drive that already has games on it. Windows sees it as a drive letter and as C:\\External\\<name>. Find games adds the games on it to the library; Steam libraries on it (steamapps or SteamLibrary) show up in the Steam section. Install Steam games on picks where new Steam downloads go by default (each install can still pick another place); on a drive they go into <name>\\SteamLibrary. Unplugging the drive while a game runs will close it. Restart Madeira after adding a folder for Windows to list the new drive.")
+            Text("Pick a folder on a USB or SSD drive, or a whole drive that already has games on it. Windows sees it as a drive letter and as C:\\External\\<name>. Find games adds the games on it to the library; Steam libraries on it (steamapps or SteamLibrary) show up in the Steam section. Install Steam games on picks where new Steam downloads go by default (each install can still pick another place); on a drive they go into <name>\\SteamLibrary. Unplugging the drive while a game runs will close it. Restart GalacWin after adding a folder for Windows to list the new drive.")
         }
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             do {
@@ -467,7 +467,7 @@ struct ExternalDrivesSection: View {
                             titleVisibility: .visible, presenting: removing) { folder in
             Button("Remove", role: .destructive) { drives.remove(folder.id) }
         } message: { _ in
-            Text("Madeira forgets this drive and removes its games from the library. The files on the drive are kept.")
+            Text("GalacWin forgets this drive and removes its games from the library. The files on the drive are kept.")
         }
         .sheet(item: $scanning) { folder in
             if let root = drives.mounted[folder.id] { ExternalGamesSheet(folder: folder, root: root.resolvingSymlinksInPath()) }

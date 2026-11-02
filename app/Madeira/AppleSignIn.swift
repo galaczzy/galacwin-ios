@@ -427,7 +427,7 @@ struct AppleSignInSheet: View {
                 Label(failure, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
             }
         } footer: {
-            Text("Sign in with the Apple ID this copy of Madeira was installed with. Madeira signs in to Apple itself: your password does not leave this device and is not kept. What is kept, in this device's Keychain, is a token for Apple's developer service. An anisette server (\(URL(string: AppleSignIn.anisetteServers[0])?.host ?? "") first) supplies the device data Apple asks for, and sees neither your Apple ID nor your password.")
+            Text("Sign in with the Apple ID this copy of GalacWin was installed with. GalacWin signs in to Apple itself: your password does not leave this device and is not kept. What is kept, in this device's Keychain, is a token for Apple's developer service. An anisette server (\(URL(string: AppleSignIn.anisetteServers[0])?.host ?? "") first) supplies the device data Apple asks for, and sees neither your Apple ID nor your password.")
         }
         .disabled(signIn.working)
     }

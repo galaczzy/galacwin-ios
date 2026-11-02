@@ -2759,7 +2759,7 @@ struct LibraryGroupedGames<LocalCell: View>: View {
         VStack(alignment: .leading, spacing: 24) {
             if groups.isEmpty {
                 if search.isEmpty {
-                    ContentUnavailableView("Make yourself at home", systemImage: "gamecontroller", description: Text("Copy a game's folder into Madeira › wine › drive_c with the Files app, then tap + and choose its .exe."))
+                    ContentUnavailableView("Make yourself at home", systemImage: "gamecontroller", description: Text("Copy a game's folder into GalacWin › wine › drive_c with the Files app, then tap + and choose its .exe."))
                 } else {
                     Text("No games match your search.").foregroundStyle(.secondary)
                 }
@@ -3075,7 +3075,7 @@ struct LibraryView: View {
                         developerUI = on; FrontendChoice.choose(new: !on); restartNotice = true
                     }))
                 } header: { Text("Interface") } footer: {
-                    Text("The developer interface is Madeira's original diagnostic screen. The change applies after Madeira restarts.")
+                    Text("The developer interface is the original project's diagnostic screen. The change applies after GalacWin restarts.")
                 }
             }
             // Search: the matching options of All settings, editable here.
@@ -3099,10 +3099,10 @@ struct LibraryView: View {
                 }
             }
         }
-        .alert("Restart Madeira", isPresented: $restartNotice) {
+        .alert("Restart GalacWin", isPresented: $restartNotice) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Close Madeira from the app switcher and open it again to switch interfaces.")
+            Text("Close GalacWin from the app switcher and open it again to switch interfaces.")
         }
         // The Settings sheets hang off the Form, never off one of its rows: a Form
         // may rebuild its rows while a sheet slides up over it, and a sheet whose
@@ -3164,7 +3164,7 @@ struct LibraryView: View {
                                           part: steamFirst ? .notInstalled : .all, open: { selected = $0 })
                     }
                 } else if model.entries.filter({ $0.desktop != true && $0.steamAppID == nil && $0.epicAppName == nil }).isEmpty {
-                    ContentUnavailableView("Make yourself at home", systemImage: "gamecontroller", description: Text("Copy a game's folder into Madeira › wine › drive_c with the Files app, then tap + and choose its .exe."))
+                    ContentUnavailableView("Make yourself at home", systemImage: "gamecontroller", description: Text("Copy a game's folder into GalacWin › wine › drive_c with the Files app, then tap + and choose its .exe."))
                 } else {
                     cells(entries, width: viewport.size.width)
                 }
@@ -3365,7 +3365,7 @@ struct ExecutableBrowser: View {
                     }
                 }
             }
-            if files.isEmpty && error == nil { Text("No executables here. Copy files into Madeira/wine/drive_c using Files.").foregroundStyle(.secondary) }
+            if files.isEmpty && error == nil { Text("No executables here. Copy files into GalacWin/wine/drive_c using Files.").foregroundStyle(.secondary) }
         }.navigationTitle(folder.lastPathComponent)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         .task {
@@ -3555,7 +3555,7 @@ struct LibraryDetail: View {
         case .display: return entry.metalFXUpscale.map { "\(entry.resolution) · MetalFX \($0 == 2 ? "2" : "1.5")×" } ?? entry.resolution
         case .controls: return entry.controllerMode == "keys" ? "Keyboard and mouse" : entry.controllerMode == "dinput" ? "XInput and DirectInput" : nil
         case .launch: return entry.usesLaunchOptions ? (entry.runsInDesktop ? "Wine desktop" : "Directly") : nil
-        case .steam: return entry.startsSteamGameDirectly ? "The game" : "Madeira Dock"
+        case .steam: return entry.startsSteamGameDirectly ? "The game" : "GalacWin Dock"
         case .advanced: return Self.configSummary(bcd.configText)   // madeira-bcd: the game's own config file
         case .iniFiles:
             let count = GameIniFiles.files(entry.windowsPath).count
@@ -4502,11 +4502,11 @@ struct RuntimeMemorySyncSettings: View {
         } header: { Text("Memory & sync") } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text("JIT pool is the memory reserved at launch for translated x86 code (256 to 1152 MB; below 512 MB, large games can run out of room for it).")
-                Text("Video memory is how much graphics memory games are told they have. Automatic sizes it from the memory free at launch. Too high can get Madeira closed for using too much memory; too low makes games keep reloading textures.")
+                Text("Video memory is how much graphics memory games are told they have. Automatic sizes it from the memory free at launch. Too high can get GalacWin closed for using too much memory; too low makes games keep reloading textures.")
                 Text("Swap tier moves game data to a file on this device's storage when memory runs short, up to the chosen size, at some speed cost. Coverage decides which allocations it moves: large ones only (8 MB and up, the default), every allocation of 1 MB and up, or those plus allocations that overflow the game's address range. Broad backs every new reservation of 4 MB and up (madeira.cfg swap-min-mb moves the floor) as it is made, so the small commits games make inside it are covered too, and the swap tier size limits the storage it uses. Wider coverage saves more memory but can slow a game down.")
                 Text("Sync engine: Fastsync (the default) handles events and semaphores in-process; its per-game options are in each game's details. Madsync is the older in-process engine. Wine standard sync uses neither. Only one engine runs at a time.")
                 Text("Eco mode starts every game with its threads at a low priority, which saves power but makes games run slower. Off by default. It is meant for loading screens: Eco mode in the in-game menu turns it on and off while a game runs.")
-                if changed { Text("Restart Madeira (close it from the app switcher) for these changes to apply.").foregroundStyle(.orange) }
+                if changed { Text("Restart GalacWin (close it from the app switcher) for these changes to apply.").foregroundStyle(.orange) }
             }
         }
         .onChange(of: refresh) { _, _ in
@@ -4920,7 +4920,7 @@ struct LibraryHUD: View {
                     ProgressView().tint(.white).modifier(LaunchEntrance(visible: launchVisible, step: 2, still: curtained))
                 }
                 if let failure = dockStart.failure {
-                    Text("Madeira Dock stopped").font(.headline)
+                    Text("GalacWin Dock stopped").font(.headline)
                     Text(failure).font(.caption).multilineTextAlignment(.center).frame(maxWidth: 360)
                 } else if dockStart.active {
                     // What the Dock start is waiting for, from the host's report, and what it
@@ -5039,7 +5039,7 @@ struct LibraryHUD: View {
     @ViewBuilder private var launchWideStatus: some View {
         if let failure = dockStart.failure {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Madeira Dock stopped").font(.headline)
+                Text("GalacWin Dock stopped").font(.headline)
                 Text(failure).font(.subheadline).foregroundStyle(.white.opacity(0.75)).frame(maxWidth: 440, alignment: .leading)
             }
         } else {
@@ -5231,18 +5231,18 @@ struct LibraryHUD: View {
                         LogStore.shared.log("[frontend] closing Madeira after the Dock game ended")
                         exit(0)
                     } label: {
-                        Label("Close Madeira", systemImage: "checkmark.circle")
+                        Label("Close GalacWin", systemImage: "checkmark.circle")
                     }
-                    Text("The game and Steam have closed, and Steam has saved. Madeira runs one game each time it is opened: open it again to play.")
+                    Text("The game and Steam have closed, and Steam has saved. GalacWin runs one game each time it is opened: open it again to play.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else if model.forceCloseOffered {
                     Button(role: .destructive) {
                         LogStore.shared.log("[frontend] force close: the program ignored the close request; closing Madeira", level: .error)
                         exit(0)
                     } label: {
-                        Label("Force close Madeira", systemImage: "xmark.octagon").foregroundStyle(.red)
+                        Label("Force close GalacWin", systemImage: "xmark.octagon").foregroundStyle(.red)
                     }.tint(.red)
-                    Text("The game did not respond to Quit game. This closes Madeira at once: unsaved progress, and settings the game changed in this session, are lost.")
+                    Text("The game did not respond to Quit game. This closes GalacWin at once: unsaved progress, and settings the game changed in this session, are lost.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(22)

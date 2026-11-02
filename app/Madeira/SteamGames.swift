@@ -159,7 +159,7 @@ enum SteamGamesRules {
     static func blocker(installed: Bool, client: Bool, signedIn: Bool, updating: Bool = false) -> String? {
         if !installed { return "Steam does not list this game as fully installed yet." }
         if updating { return "This game is being downloaded. Play is available when it is done." }
-        if !client { return "Madeira Dock needs Valve's client components. Download them in Settings › Steam › Madeira Dock." }
+        if !client { return "GalacWin Dock needs Valve's client components. Download them in Settings › Steam › GalacWin Dock." }
         if !signedIn { return "Sign in to Steam in Settings › Steam to play." }
         return nil
     }
@@ -624,7 +624,7 @@ struct SteamSignInCard: View {
                 Image(systemName: "person.crop.circle.badge.plus").font(.system(size: 30)).foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sign in to Steam").font(.headline)
-                    Text("See your Steam games here and install them without leaving Madeira.")
+                    Text("See your Steam games here and install them without leaving GalacWin.")
                         .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)
@@ -1091,7 +1091,7 @@ struct SteamCloudQuitRow: View {
     var body: some View {
         if SteamOwnedLibrary.cloudQuitEnabled, steam.signedIn {
             VStack(alignment: .leading, spacing: 8) {
-                Button("Upload saves and close Madeira", systemImage: "icloud.and.arrow.up") { run(replaceCloud: false) }
+                Button("Upload saves and close GalacWin", systemImage: "icloud.and.arrow.up") { run(replaceCloud: false) }
                     .disabled(working)
                 switch steam.cloudQuit {
                 case .working(let text):
@@ -1100,7 +1100,7 @@ struct SteamCloudQuitRow: View {
                     Label(count == 0 ? "Steam Cloud is already up to date. Closing…" : "Uploaded \(count) save\(count == 1 ? "" : "s"). Closing…",
                           systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
                 case .failed(let message):
-                    Text("Not uploaded, Madeira stays open: \(message)").font(.callout).foregroundStyle(.orange)
+                    Text("Not uploaded, GalacWin stays open: \(message)").font(.callout).foregroundStyle(.orange)
                 case .conflict(let count):
                     Text("Not uploaded: \(count) save\(count == 1 ? " was" : "s were") also changed in Steam Cloud, by another device or with no record of a sync here. Uploading would replace the cloud's \(count == 1 ? "copy" : "copies").")
                         .font(.callout).foregroundStyle(.orange)
@@ -1108,11 +1108,11 @@ struct SteamCloudQuitRow: View {
                         .confirmationDialog("Replace the Steam Cloud saves with this device's?", isPresented: $confirmReplace, titleVisibility: .visible) {
                             Button("Replace the cloud saves", role: .destructive) { run(replaceCloud: true) }
                             Button("Cancel", role: .cancel) { }
-                        } message: { Text("The saves in Steam Cloud are overwritten for every device. Their current copies are saved first, in Files › Madeira › Steam Cloud Backups.") }
+                        } message: { Text("The saves in Steam Cloud are overwritten for every device. Their current copies are saved first, in Files › GalacWin › Steam Cloud Backups.") }
                 case nil:
                     EmptyView()
                 }
-                Text("Save in the game first. Uploads this game's saves to Steam Cloud, then closes Madeira; Steam in this session is signed out when the upload starts.")
+                Text("Save in the game first. Uploads this game's saves to Steam Cloud, then closes GalacWin; Steam in this session is signed out when the upload starts.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -1155,7 +1155,7 @@ struct SteamCloudSection: View {
             } header: {
                 Text("Steam Cloud")
             } footer: {
-                Text("Syncs when Madeira starts and when this page opens, not while you play. Use Upload saves when you stop. Replaced saves go to Files › Madeira › Steam Cloud Backups.")
+                Text("Syncs when GalacWin starts and when this page opens, not while you play. Use Upload saves when you stop. Replaced saves go to Files › GalacWin › Steam Cloud Backups.")
             }
         }
     }
@@ -1279,7 +1279,7 @@ struct SteamEntrySection: View {
         let direct = entry.startsSteamGameDirectly
         Section {
             Picker("Start with", selection: Binding(get: { direct ? SteamDirectStart.mode : "dock" }, set: { choose($0) })) {
-                Text("Madeira Dock").tag("dock")
+                Text("GalacWin Dock").tag("dock")
                 Text("The game").tag(SteamDirectStart.mode)
             }
             if direct {
@@ -1304,7 +1304,7 @@ struct SteamEntrySection: View {
                 }
             } else {
                 if !dock.clientInstalled {
-                    Text("Needs Valve's client: Settings › Steam › Madeira Dock.")
+                    Text("Needs Valve's client: Settings › Steam › GalacWin Dock.")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 // A program in place of the one Steam's launch entry names (DockStartProgram).
@@ -1313,10 +1313,10 @@ struct SteamEntrySection: View {
                     ForEach(dockPrograms, id: \.self) { Text($0).tag($0) }
                 }.pickerStyle(.navigationLink)
                 if dockProgram != nil {
-                    Text("Madeira puts a copy of this program in place of the one Steam starts (the launcher is kept, and goes back with Steam's choice). Steam still starts the game and checks ownership.")
+                    Text("GalacWin puts a copy of this program in place of the one Steam starts (the launcher is kept, and goes back with Steam's choice). Steam still starts the game and checks ownership.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("For a game whose launcher closes Madeira when it starts the game (Fallout: New Vegas): pick the game's own program.")
+                    Text("For a game whose launcher closes GalacWin when it starts the game (Fallout: New Vegas): pick the game's own program.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle("Smaller JIT pool (512 MB) for this launch", isOn: $dock.compactPool)
