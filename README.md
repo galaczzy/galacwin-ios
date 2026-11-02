@@ -1,10 +1,11 @@
 # GalacWin iOS
 
 > [!WARNING]
-> **Security review in progress. No IPA from this repository is approved or
-> published. Do not install the upstream project's IPA as a build of this
-> fork, and do not use personal Steam or Apple credentials with an unreviewed
-> build.** GalacWin iOS is a GPL-licensed derivative of
+> **Security review in progress. An encrypted audit IPA has been built and
+> verified structurally, but no public IPA release is approved. Do not install
+> the upstream project's IPA as a build of this fork, and do not enter personal
+> Steam, Epic or Apple credentials into GalacWin during device tests.**
+> GalacWin iOS is a GPL-licensed derivative of
 > [willfaust/Madeira](https://github.com/willfaust/Madeira), initially based on
 > commit `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. It is not an
 > independent clean-room implementation and is not affiliated with or endorsed
@@ -53,8 +54,9 @@ Wine's server runs as a thread instead of a separate program.
 
 ## Requirements
 
-- An iPhone on **iOS 26 or later**, the only version Madeira currently runs
-  on reliably. Development happens on recent Pro iPhones.
+- An iPhone on **iOS 26 or later** is the upstream project's documented target.
+  GalacWin's compatibility with the owner's iPad Pro M5 on iPadOS 27 still
+  needs a device test.
 - **JIT**, which iOS only allows while a debugger is attached. Madeira can use
   [StikDebug](https://github.com/StikDebug/StikDebug) or its built-in StikJIT
   helper. On iOS 27 the built-in helper can pair the iPhone itself, without a
@@ -69,10 +71,10 @@ Because JIT needs a debugger, Madeira cannot be offered on the App Store.
 
 ## Installing
 
-There is no installable release for this fork. Its build workflow is manual;
-an isolated audit build may run without publishing an IPA, while any IPA
-publication requires security approval. [SECURITY.md](SECURITY.md) records the
-remaining dependencies, binary provenance checks, signing, and device tests.
+There is no public installable release for this fork. A manual, isolated audit
+build completed in [Actions #41391432408](https://github.com/galaczzy/galacwin-ios/actions/runs/41391432408),
+which published only an encrypted artifact. [SECURITY.md](SECURITY.md) records
+the IPA hash and the remaining dependency, antivirus, signing, and device checks.
 
 ## Building from source
 
