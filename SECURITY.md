@@ -2,13 +2,14 @@
 
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
-atribuciones. **El IPA de auditoría v4 del commit
-`806f3d2494d63c435c43420dcb7d4dd41a5d3c5b` pasó la verificación de
+atribuciones. **El IPA de auditoría v5 del commit
+`8ead5c885e82fdd2cf7a5e1d08f243f7e019988a` pasó la verificación de
 integridad y una pasada completa de ClamAV 1.5.4 sin detecciones de malware
-conocido. Con PUA activadas sólo apareció la alerta ya investigada del
-`kernel32.dll` ARM64EC de Wine. El usuario confirmó su instalación y arranque
-sin Wi-Fi en un iPad Pro M5 y que la prueba aislada de JIT devolvió 42. Juegos
-y uso con cuentas personales siguen sin probarse.** Una revisión de código,
+conocido. Con PUA activadas sólo apareció la misma alerta ya investigada del
+`kernel32.dll` ARM64EC de Wine, que no cambió desde v4. La prueba en el iPad de
+v5 está pendiente. El usuario sí confirmó que v4 instaló, abrió sin Wi-Fi,
+ejecutó la prueba JIT que devolvió 42 y abrió Notepad en el escritorio Wine.
+Juegos y uso con cuentas personales siguen sin probarse.** Una revisión de código,
 un resultado antivirus y una prueba en dispositivo no pueden demostrar ausencia
 absoluta de malware. El artefacto público de Actions contiene únicamente un
 IPA cifrado para una clave guardada fuera del repositorio.
@@ -106,8 +107,14 @@ configuración antes de arrancar; el paso previo a instaladores tampoco inicia
 el gestor de servicios. Esto limita juegos e instaladores que requieren ese
 servicio. La procedencia del ejecutable de servicio investigado está en
 [docs/STEAM_SERVICE_PROVENANCE.md](docs/STEAM_SERVICE_PROVENANCE.md). El IPA v4
-instalado antes de esta revisión no incorpora ese parche. Falta compilar y
-probar el parche en un IPA nuevo y completar el resto de la auditoría.
+instalado antes de esta revisión no incorpora ese parche. El [IPA v5 de
+auditoría](https://github.com/galaczzy/galacwin-ios/actions/runs/41526771615)
+sí lo incorpora: su SHA-256 local coincide con el registrado por el runner,
+`19228d7c70c56970a63b0945e3ad035a1e29ec372d28f1f99809dbb4a403a416`.
+El verificador estático aprobó 1 432 entradas y los hashes de 577 archivos del
+runtime. ClamAV examinó 1,11 GiB sin detecciones de malware conocido; con PUA
+activadas señaló sólo la firma anterior. Aún falta probar v5 en el iPad y
+completar el resto de la auditoría.
 
 ## Controles aplicados
 
