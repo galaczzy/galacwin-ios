@@ -54,6 +54,7 @@ jobs:
           python3 tests/host/check-ci-llvm-cache.py
           python3 tests/host/check-clean-bootstrap.py
           python3 tests/host/check-app-link-inputs.py
+          python3 tests/host/check-jit-method.py
           python3 tests/host/check-runtime-components.py
       - name: Check Steam connection recovery
         if: hashFiles('tests/host/check-steam-cm-transport.py') != ''
