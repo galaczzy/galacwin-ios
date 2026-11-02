@@ -45,6 +45,18 @@ minutos. Esto es un resultado inconcluso del informe, no una prueba de ausencia
 de tráfico. La observación anterior de «sin dominios registrados» pertenecía
 al IPA v1.
 
+El [IPA de auditoría v3](https://github.com/galaczzy/galacwin-ios/actions/runs/41475453651)
+del commit `d9cf3bef8d12205892f6ea89e8f9462bfab87ad9` reconstruyó StikJIT y
+su dependencia `idevice` desde fuentes fijadas en la misma ejecución. El
+SHA-256 del IPA local coincide con el registrado por el runner:
+`2609872472b7054069514894700ca2cb9c779765c94f89c594b9546e107e6192`.
+La verificación estática independiente aprobó sus 1 432 entradas; ClamAV 1.5.4
+no detectó malware conocido en una pasada completa sin PUA. Con PUA activadas
+señaló sólo la misma firma `PUA.Win.Packer.Embedpe-3` del `kernel32.dll` de Wine
+que en v2. La instalación y apertura de v3 en el iPad siguen pendientes.
+Estos resultados no prueban que el código o sus dependencias estén libres de
+malware ni validan JIT.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`
@@ -94,8 +106,8 @@ al IPA v1.
   [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md).
 - El ayudante JIT del código actual sólo entrega a StikJIT imágenes DDI cuyo
   tamaño y SHA-256 coinciden con un conjunto fijado a un commit concreto;
-  véase [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). Esto todavía
-  no está presente en el IPA de auditoría descrito abajo.
+  véase [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). Esto está
+  presente en los IPA v2 y v3, pero no en el IPA v1 descrito al final.
 - El prefijo Wine incluido ya no contiene `chcp.com` ni el instalador MSI. Se
   verificó que las otras 136 entradas conservaran su contenido y metadatos;
   el compilador exige su SHA-256 aprobado y rechaza rutas, enlaces y tipos de
@@ -107,13 +119,13 @@ al IPA v1.
    auditoría inicial y el ZIP del proyecto principal no contenían sus cuerpos.
    El runner sí descargó y compiló los submódulos, lo cual no equivale a una
    auditoría de todo su código.
-2. Establecer procedencia independiente de los demás binarios precompilados,
-   los archivos restantes del prefijo comprimido, y reconstruir o auditar el código fuente
-   de StikJIT. La coincidencia con su ZIP oficial establece el origen del
-   framework, pero no demuestra ausencia de malware. La etiqueta 1.9.0 de
-   StikJIT enlaza un archivo `idevice` ya compilado. El código actual llena y
-   verifica la caché DDI antes de invocar StikJIT. El IPA v2 incorpora esa
-   protección, pero aún se debe validar en el dispositivo; véanse
+2. Establecer procedencia independiente de los demás binarios precompilados y
+   los archivos restantes del prefijo comprimido, y ampliar la auditoría del
+   código fuente de StikJIT y sus dependencias. La etiqueta 1.9.0 de StikJIT
+   incluye un archivo `idevice` ya compilado; el IPA v3 lo sustituyó por uno
+   reconstruido desde fuentes fijadas. El código actual llena y verifica la
+   caché DDI antes de invocar StikJIT. Los IPA v2 y v3 incorporan esa
+   protección, pero JIT aún se debe validar en el dispositivo; véanse
    [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md) y
    [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). El inventario
    `security/upstream-binaries.csv` sólo registra hashes de la copia.

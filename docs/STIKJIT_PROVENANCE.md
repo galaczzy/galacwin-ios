@@ -70,17 +70,17 @@ sus diez entradas pasaron la comprobación CRC. Esta es evidencia de que
 **se puede reconstruir y enlazar**, no una prueba funcional de JIT ni una
 auditoría completa de sus dependencias.
 
-El flujo experimental se trasladó a `tools/build/build-stikjit-source.sh` para
-que el siguiente IPA de auditoría reconstruya el framework en la misma
-ejecución. El script fija los commits de `idevice` y StikJIT, exige
+El flujo experimental se trasladó a `tools/build/build-stikjit-source.sh` y el
+IPA de auditoría v3 reconstruyó el framework en la misma ejecución. El script
+fija los commits de `idevice` y StikJIT, exige
 `cargo --locked` y verifica por SHA-256 el ZIP de XcodeGen 2.46.0 antes de
 extraerlo y ejecutarlo. Ese ZIP se descargó sin ejecutarlo en Windows y su
 hash coincidió con el digest de la [versión oficial de
 XcodeGen](https://github.com/yonaskolb/XcodeGen/releases/tag/2.46.0):
 `4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806`.
 El flujo de IPA compara el binario reconstruido con el contenido del IPA antes
-de cifrarlo. Hasta que ese flujo termine y se valide su salida, el IPA v2
-instalado conserva la versión precompilada original.
+de cifrarlo. El IPA v2 instalado anteriormente conserva la versión
+precompilada original.
 
 La [ejecución de comprobación #41474582986](https://github.com/galaczzy/galacwin-ios/actions/runs/41474582986)
 ejecutó el script compartido y terminó correctamente. El ZIP del artefacto
@@ -90,3 +90,23 @@ La biblioteca FFI, su encabezado y los diez archivos del framework resultaron
 idénticos byte por byte a los de la ejecución #41472357918. Esto mejora la
 trazabilidad de esta reconstrucción concreta; no demuestra que todo el código
 fuente o sus dependencias sean seguros.
+
+## IPA de auditoría v3
+
+La [compilación #41475453651](https://github.com/galaczzy/galacwin-ios/actions/runs/41475453651)
+del commit `d9cf3bef8d12205892f6ea89e8f9462bfab87ad9` terminó correctamente.
+El SHA-256 del IPA antes de cifrarlo, registrado por el runner, es
+`2609872472b7054069514894700ca2cb9c779765c94f89c594b9546e107e6192`;
+el mismo valor se obtuvo del archivo descifrado localmente. El binario StikJIT
+dentro de ese IPA tiene SHA-256
+`cedba2339d83fdb77d842655005667eedd15508c611dbd2a0eb4693b0b9d6b89`,
+igual al reconstruido en el runner y en las dos ejecuciones de prueba.
+
+El verificador independiente aprobó 1 432 entradas del IPA, sus rutas y CRC,
+la identidad, el prefijo y los hashes de 577 archivos de runtime. ClamAV 1.5.4,
+con bases oficiales actualizadas, examinó 1.11 GiB sin detectar firmas de
+malware conocido en la pasada completa sin PUA. Con PUA activadas señaló
+únicamente `PUA.Win.Packer.Embedpe-3` en el `kernel32.dll` de Wine, idéntico al
+de v2. La prueba de instalación y apertura de v3 en el iPad sigue pendiente.
+La reconstrucción y estas comprobaciones no demuestran ausencia absoluta de
+malware ni validan la función JIT.
