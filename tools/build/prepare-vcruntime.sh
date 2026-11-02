@@ -102,13 +102,16 @@ PYPE
 
 for dll in "${DLLS[@]}"; do
   src=""
+  expected="$(awk -v name="$dll" '$2 == name { print $1 }' "$ROOT/tools/build/vc-redist-x64.sha256")"
+  [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || { echo "ERROR: missing approved digest for $dll" >&2; exit 1; }
   while IFS= read -r candidate; do
-    if is_amd64_pe "$candidate"; then
+    if is_amd64_pe "$candidate" &&
+       [[ "$(shasum -a 256 "$candidate" | awk '{ print $1 }')" == "$expected" ]]; then
       src="$candidate"
       break
     fi
   done < <(find "$TMP/cabs" -type f \( -iname "$dll" -o -iname "${dll}_*" \) | sort)
-  [[ -n "$src" ]] || { echo "ERROR: x86_64 $dll not found in Microsoft redistributable" >&2; exit 1; }
+  [[ -n "$src" ]] || { echo "ERROR: approved x86_64 $dll not found in Microsoft redistributable" >&2; exit 1; }
   cp "$src" "$DEST/$dll"
 done
 
