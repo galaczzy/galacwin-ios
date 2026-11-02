@@ -120,7 +120,10 @@ IPA. No se han ejecutado juegos ni instaladores de terceros en esta etapa.
   hash del manifiesto generado desde Wine en el commit fijado
   `df1c5ea51e194937ac204bc3120922dc56a61bec`. Su encabezado de máquina
   `0x8664` y las secciones híbridas son compatibles con un PE ARM64EC; esto
-  hace plausible una detección heurística, pero no demuestra que sea falsa.
+  hace plausible una detección heurística. El DLL rastreado antes de la
+  compilación tiene un hash distinto, pero activa la misma firma; en ambos la
+  secuencia coincidente contiene relleno seguido de `KERNEL32.`. Es evidencia
+  de que la regla reconoce el formato, pero no demuestra que sea falsa.
 
 ## Evidencia local
 
