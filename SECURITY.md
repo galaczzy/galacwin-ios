@@ -53,9 +53,10 @@ SHA-256 del IPA local coincide con el registrado por el runner:
 La verificación estática independiente aprobó sus 1 432 entradas; ClamAV 1.5.4
 no detectó malware conocido en una pasada completa sin PUA. Con PUA activadas
 señaló sólo la misma firma `PUA.Win.Packer.Embedpe-3` del `kernel32.dll` de Wine
-que en v2. La instalación y apertura de v3 en el iPad siguen pendientes.
-Estos resultados no prueban que el código o sus dependencias estén libres de
-malware ni validan JIT.
+que en v2. El usuario confirmó que Sideloadly instaló v3 y que GalacWin llegó
+a la biblioteca en un iPad Pro M5 con Wi-Fi apagado, JIT desactivado y sin
+avisos. Estos resultados no prueban que el código o sus dependencias estén
+libres de malware ni validan JIT.
 
 ## Controles aplicados
 

@@ -107,6 +107,7 @@ la identidad, el prefijo y los hashes de 577 archivos de runtime. ClamAV 1.5.4,
 con bases oficiales actualizadas, examinó 1.11 GiB sin detectar firmas de
 malware conocido en la pasada completa sin PUA. Con PUA activadas señaló
 únicamente `PUA.Win.Packer.Embedpe-3` en el `kernel32.dll` de Wine, idéntico al
-de v2. La prueba de instalación y apertura de v3 en el iPad sigue pendiente.
+de v2. El usuario confirmó que Sideloadly instaló v3 y que GalacWin llegó a
+la biblioteca en un iPad Pro M5 con Wi-Fi apagado, JIT desactivado y sin avisos.
 La reconstrucción y estas comprobaciones no demuestran ausencia absoluta de
-malware ni validan la función JIT.
+malware ni validan la función JIT, juegos o cuentas personales.
