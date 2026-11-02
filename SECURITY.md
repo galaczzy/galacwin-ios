@@ -34,7 +34,10 @@ registró el runner antes del cifrado. El verificador independiente pasó todas
 sus comprobaciones. ClamAV 1.5.4 con la base `daily` 28172 examinó 1.11 GiB:
 la pasada de malware terminó `OK` y la pasada PUA con búsqueda de todas las
 coincidencias marcó sólo el `kernel32.dll` de Wine con la misma firma anterior.
-**El IPA v2 aún no se ha probado en el iPad y JIT sigue sin aprobarse.**
+El usuario confirmó que Sideloadly instaló el IPA v2 y que GalacWin llegó a la
+biblioteca con Wi-Fi apagado, sin avisos. **JIT sigue sin aprobarse.** Esta
+prueba de interfaz no inspeccionó el paquete vuelto a firmar ni ejercitó juegos
+o cuentas.
 
 ## Controles aplicados
 
