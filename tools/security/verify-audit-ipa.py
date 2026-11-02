@@ -6,6 +6,7 @@ import hashlib
 import json
 import plistlib
 from pathlib import Path, PurePosixPath
+import re
 import stat
 import subprocess
 import zipfile
@@ -26,11 +27,26 @@ def fail(message):
     raise SystemExit("ERROR: " + message)
 
 
+def read_small(archive, relative, maximum):
+    entry = archive.getinfo(APP + relative)
+    if entry.file_size > maximum:
+        fail(f"oversized IPA metadata: {relative}")
+    with archive.open(entry) as stream:
+        data = stream.read(maximum + 1)
+    if len(data) > maximum:
+        fail(f"oversized IPA metadata: {relative}")
+    return data
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ipa", type=Path)
     parser.add_argument("--sha256", help="Expected IPA SHA-256 from the build log")
+    parser.add_argument("--source-revision", default="HEAD",
+                        help="Exact build commit when verifying with a newer copy of this tool")
     args = parser.parse_args()
+    if args.source_revision != "HEAD" and not re.fullmatch(r"[0-9a-f]{40}", args.source_revision):
+        fail("source revision must be HEAD or an exact 40-character commit SHA")
     if args.sha256:
         with args.ipa.open("rb") as stream:
             actual = sha256_stream(stream)
@@ -64,7 +80,7 @@ def main():
                 fail("unexpected IPA expanded size")
         print(f"PASS: {len(entries)} unique IPA entries have safe paths and sizes")
 
-        info = plistlib.loads(archive.read(APP + "Info.plist"))
+        info = plistlib.loads(read_small(archive, "Info.plist", 2 * 1024 ** 2))
         schemes = {scheme for item in info.get("CFBundleURLTypes", [])
                    for scheme in item.get("CFBundleURLSchemes", [])}
         if (info.get("CFBundleDisplayName") != "GalacWin" or
@@ -85,7 +101,7 @@ def main():
         for source, bundled in [("COPYING", "licenses/LICENSE-MADEIRA-GPL-3.0.txt"),
                                 ("LICENSE-EXCEPTION.md", "licenses/LICENSE-MADEIRA-EXCEPTION.txt"),
                                 ("LICENSE-GALACWIN-EXCEPTION.md", "licenses/LICENSE-GALACWIN-EXCEPTION.txt")]:
-            if archive.read(APP + bundled) != (ROOT / source).read_bytes():
+            if read_small(archive, bundled, 1024 ** 2) != (ROOT / source).read_bytes():
                 fail(f"bundled license differs from source: {source}")
         from importlib.util import module_from_spec, spec_from_file_location
         module_path = ROOT / "tools/security/check_prefix_template.py"
@@ -97,9 +113,9 @@ def main():
                 fail("bundled Wine prefix differs from the reviewed SHA-256")
         print("PASS: required resources, license texts and reviewed Wine prefix")
 
-        manifest = json.loads(archive.read(APP + "runtime-build.json"))
+        manifest = json.loads(read_small(archive, "runtime-build.json", 16 * 1024 ** 2))
         source_tree = subprocess.check_output(
-            ["git", "-C", str(ROOT), "rev-parse", "HEAD^{tree}"], text=True).strip()
+            ["git", "-C", str(ROOT), "rev-parse", f"{args.source_revision}^{{tree}}"], text=True).strip()
         if manifest.get("schema") != 1 or manifest.get("tree") != source_tree:
             fail("embedded runtime manifest belongs to another source tree")
         contract = json.loads((ROOT / "tools/build/runtime-components.json").read_text())
