@@ -84,6 +84,15 @@ returned 42.» Esta observación valida una función generada en esa sesión; no
 valida juegos, otras rutas de JIT, el paquete vuelto a firmar ni ausencia
 absoluta de malware.
 
+En una prueba funcional posterior con el mismo IPA v4, el usuario informó que
+«Desktop → Play» abrió el escritorio de Wine, que podía mover el cursor y que
+«Start → Run» abrió el `notepad.exe` incluido en el paquete. Escribió una frase
+de prueba sin guardarla; el texto apareció y la ventana siguió respondiendo.
+La app avisó que el pool JIT de esa sesión se redujo a 608 MB y que juegos
+grandes podrían no cargar. El código emite ese aviso cuando la asignación fue
+menor a la solicitada; no es una detección de malware. Esta prueba no valida
+juegos, rendimiento ni todas las funciones del escritorio.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`
