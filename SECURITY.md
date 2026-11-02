@@ -6,9 +6,11 @@ atribuciones. **La compilación de auditoría aislada de
 [Actions #41391432408](https://github.com/galaczzy/galacwin-ios/actions/runs/41391432408)
 terminó correctamente el 2026-11-02, sin cuentas ni secretos personales. El
 artefacto público contiene únicamente un IPA cifrado para la clave guardada
-fuera del repositorio. El IPA descifrado pasó la verificación estática local,
-pero todavía falta el análisis antivirus y la prueba en un dispositivo. No está
-aprobado para usar con cuentas personales.** Una revisión de
+fuera del repositorio. El IPA descifrado pasó la verificación estática local.
+ClamAV 1.5.4 no halló firmas de malware conocidas en una pasada completa, pero
+sí señaló `PUA.Win.Packer.Embedpe-3` en el `kernel32.dll` ARM64EC construido de
+Wine. Falta probar el IPA en un dispositivo y no está aprobado para usar con
+cuentas personales.** Una revisión de
 código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
 
 ## Controles aplicados
@@ -91,10 +93,11 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
    prototipo antes de exponerlo en una red; el lanzador de prueba ahora usa
    loopback por defecto, pero el cliente de la app aún usa TCP sin cifrar
    cuando se configura `remote`.
-6. Completar el análisis antivirus local y probar el IPA en un iPad con datos
-   de prueba antes de introducir cuentas personales. La compilación macOS/Xcode
-   de auditoría y la verificación estática del IPA terminaron correctamente;
-   no demuestran seguridad de comportamiento en el dispositivo.
+6. Investigar la alerta PUA de ClamAV y probar el IPA en un iPad con datos de
+   prueba antes de introducir cuentas personales. La compilación macOS/Xcode
+   de auditoría, la verificación estática y una pasada antivirus sin firmas
+   de malware terminaron correctamente; no demuestran seguridad de
+   comportamiento en el dispositivo.
 
 La app ejecuta juegos de Windows dentro de su propio proceso. Un juego o
 instalador malicioso sigue siendo un riesgo independiente de la procedencia del
@@ -109,6 +112,15 @@ IPA. No se han ejecutado juegos ni instaladores de terceros en esta etapa.
   identidad de GalacWin, textos de licencia del commit, prefijo Wine fijado,
   577 archivos de runtime contra sus hashes y CRC completo del ZIP.
 - El archivo IPA sin cifrar no se publicó como artefacto de GitHub.
+- ClamAV 1.5.4 con base oficial actualizada escaneó 1.11 GiB de contenido del
+  IPA. Con firmas de malware y PUA activas marcó únicamente
+  `Payload/Madeira.app/arm64ec-windows/kernel32.dll` como
+  `PUA.Win.Packer.Embedpe-3`; una pasada completa con las firmas PUA
+  desactivadas terminó `OK`, cero archivos infectados. El DLL coincide con el
+  hash del manifiesto generado desde Wine en el commit fijado
+  `df1c5ea51e194937ac204bc3120922dc56a61bec`. Su encabezado de máquina
+  `0x8664` y las secciones híbridas son compatibles con un PE ARM64EC; esto
+  hace plausible una detección heurística, pero no demuestra que sea falsa.
 
 ## Evidencia local
 
