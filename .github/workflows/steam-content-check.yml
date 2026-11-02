@@ -1,0 +1,20 @@
+name: Steam content safety check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host_fixture:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Run isolated Steam fixture
+        run: |
+          brew install zstd
+          python3 tests/host/check-steam-library.py
