@@ -455,9 +455,9 @@ enum MadeiraDock {
         // explorer/cmd command. An empty profile clears any previous game's choice.
         if arguments.isEmpty { unsetenv("MADEIRA_STEAM_HOST_ARGUMENTS") }
         else { setenv("MADEIRA_STEAM_HOST_ARGUMENTS", arguments, 1) }
-        // The install record lists per-user executables: Dock asks Valve's client to prepare
-        // them before it launches. env.MADEIRA_DOCK_CEG = 0 never asks.
-        if game.customExecutables && SteamSignIn.flag("MADEIRA_DOCK_CEG", default: true) {
+        // Preserve the install record's CEG marker. The audited host refuses
+        // these launches until the registered service executable is verified.
+        if game.customExecutables {
             setenv("MADEIRA_STEAM_HOST_CEG", "1", 1)
         } else {
             unsetenv("MADEIRA_STEAM_HOST_CEG")

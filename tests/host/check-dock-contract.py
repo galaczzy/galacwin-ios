@@ -239,9 +239,9 @@ func jwt(_ claims: String) -> String {
         require(env("MADEIRA_STEAM_HOST_APPID") == "4000" && env("MADEIRA_STEAM_HOST_CLIENT_DIR") == "C:\\Program Files (x86)\\Steam" &&
                 env("MADEIRA_STEAM_HOST_EXPECTED_INSTALL") == game.windowsInstallPath && env("MADEIRA_STEAM_HOST_LOG") == "C:\\madeira-dock.txt", "host inputs")
         require(env("MADEIRA_STEAM_HOST_ACCOUNT") == nil && env("MADEIRA_STEAM_HOST_STEAMID") == nil, "the cached-account test path is never selected")
-        require(env("MADEIRA_STEAM_HOST_CEG") == "1", "custom executables: Dock asks the client to prepare them")
+        require(env("MADEIRA_STEAM_HOST_CEG") == "1", "custom executables: Dock marks the launch for fail-closed handling")
         setenv("MADEIRA_DOCK_CEG", "0", 1); MadeiraDock.configure(game)
-        require(env("MADEIRA_STEAM_HOST_CEG") == nil, "MADEIRA_DOCK_CEG=0 never asks")
+        require(env("MADEIRA_STEAM_HOST_CEG") == "1", "a legacy override cannot bypass the CEG gate")
         unsetenv("MADEIRA_DOCK_CEG"); MadeiraDock.configure(alpha)
         require(env("MADEIRA_STEAM_HOST_CEG") == nil, "no custom executables: not asked")
         require(env("MADEIRA_JIT_IMAGE_RETIRE") == "1", "a Dock launch turns the engine's image-retire switch on")

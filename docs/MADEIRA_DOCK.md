@@ -419,9 +419,11 @@ plan, the running program and, once the batch ended, how many succeeded.
 `madeira-dock-installs.json` next to the registry files holds the
 batch's program list and each game's choice.
 
-If the install record lists per-user custom executables (`CheckGuid`), Dock
-asks Valve's client to prepare them before launching. `env.MADEIRA_DOCK_CEG = 0`
-never asks. The preparation is Valve's; Dock does not touch the files.
+In this GalacWin audit build, a game whose install record lists per-user custom
+executables (`CheckGuid`) is blocked before launch. The Steam Client Service
+registration and its binary have not yet been verified as a safe execution
+boundary. The old `MADEIRA_DOCK_CEG` override cannot bypass this gate. Games
+that need this service cannot be tested with this build.
 
 ## Switches
 
@@ -432,7 +434,6 @@ never asks. The preparation is Valve's; Dock does not touch the files.
 | `MADEIRA_DOCK` | on | `0` hides the Dock button |
 | `MADEIRA_DOCK_COMPACT_POOL` | **off** | `1` starts the sheet's "Smaller JIT pool" toggle on |
 | `MADEIRA_DOCK_CLEAR_STEAM_ID` | on | `0`: a Dock session keeps the fixed Steam game identity every other launch publishes |
-| `MADEIRA_DOCK_CEG` | on | `0`: never ask the client to prepare per-user executables |
 | `MADEIRA_DOCK_IMAGE_RETIRE` | on | `0`: a Dock launch does not turn on the engine's `MADEIRA_JIT_IMAGE_RETIRE` (an explicit `env.MADEIRA_JIT_IMAGE_RETIRE` still wins) |
 | `MADEIRA_DOCK_IMAGE_MAP_GUARD` | on | `0`: a Dock launch does not turn on Wine's `MADEIRA_IMAGE_MAP_GUARD` |
 | `MADEIRA_DOCK_CLIENT_202601` | on | read by the host: `0` disables its January 2026 client adapter |
@@ -442,7 +443,7 @@ never asks. The preparation is Valve's; Dock does not touch the files.
 | `MADEIRA_DOCK_INSTALLERS` | on | `0`: no one-time installs (nothing read, run or shown) |
 | `MADEIRA_INSTALL_DEFAULT_KEY` | on | `0`: install-script entries without a `HasRunKey` are ignored |
 | `MADEIRA_DOCK_INSTALL_CHOICE` | on | `0`: no per-game choice; every start runs whatever is pending |
-| `MADEIRA_DOCK_INSTALL_SCM` | on | `0`: the batch records "services off" instead of starting the service manager (also read by the host's `--start-services`) |
+| `MADEIRA_DOCK_INSTALL_SCM` | off in this audit build | The host's `--start-services` always records "services off" and does not start a service manager; installers that require one may fail |
 | `MADEIRA_DOCK_INSTALL_SERVER_SYNC` | on | `0`: a start that runs installers keeps madsync and leaves the service step out |
 | `MADEIRA_DOCK_INSTALL_SEPARATE` | on | madeira-bcd. `0`: the host follows the installers in the same session |
 | `MADEIRA_DOCK_INSTALL_LAYOUT` | on | madeira-bcd. `0`: a session of one-time installs keeps the game's `env.MADEIRA_SC_PA_POOLS` and `env.MADEIRA_RDR2_VA_HOLD` lines |

@@ -93,6 +93,22 @@ grandes podrían no cargar. El código emite ese aviso cuando la asignación fue
 menor a la solicitada; no es una detección de malware. Esta prueba no valida
 juegos, rendimiento ni todas las funciones del escritorio.
 
+Una revisión completa del submódulo fijado `madeira-dock` encontró tres
+problemas condicionados: una DLL de Steam desconocida podía cargarse antes de
+rechazar una sesión; el instalador del servicio de Steam sólo comprobaba si
+existía su ejecutable; y el informe del escáner de privacidad repetía el texto
+encontrado. El parche de auditoría exige un hash de cliente reconocido antes
+de cargar la DLL con una credencial, comprueba y mantiene abiertos los
+componentes de la ruta durante la carga, y oculta tanto el texto como el nombre
+del archivo en el informe de privacidad. La ruta CEG queda bloqueada porque un
+servicio ya registrado puede apuntar a otro ejecutable o cambiar su
+configuración antes de arrancar; el paso previo a instaladores tampoco inicia
+el gestor de servicios. Esto limita juegos e instaladores que requieren ese
+servicio. La procedencia del ejecutable de servicio investigado está en
+[docs/STEAM_SERVICE_PROVENANCE.md](docs/STEAM_SERVICE_PROVENANCE.md). El IPA v4
+instalado antes de esta revisión no incorpora ese parche. Falta compilar y
+probar el parche en un IPA nuevo y completar el resto de la auditoría.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`

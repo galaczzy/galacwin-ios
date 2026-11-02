@@ -1,0 +1,227 @@
+diff --git a/src/launch.c b/src/launch.c
+index 8aed4e1..00d427a 100644
+--- a/src/launch.c
++++ b/src/launch.c
+@@ -171,6 +171,14 @@ int sh_launch(HMODULE module, void *engine, void *client_user,
+               int32_t pipe, int32_t user, uint64_t steamid, uint32_t appid,
+               const struct dock_client_layout *layout)
+ {
++    /* An existing Steam Client Service registration can point at a different
++     * executable, and service configuration can change before demand-start.
++     * Block CEG launches in this audit build until the service trust boundary
++     * has been tested on device. Do not honor the legacy bypass flag. */
++    if (wide_flag(L"MADEIRA_STEAM_HOST_CEG", L'1')) {
++        o->event("ceg-service-disabled", 1);
++        return 49;
++    }
+     if (!layout || !method_is(module, engine, 43, layout->engine_manager) ||
+         !method_is(module, engine, 33, layout->engine_result) ||
+         !method_is(module, client_user, 67, layout->running)) return 40;
+diff --git a/src/main.c b/src/main.c
+index 2ab32ce..9216c46 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -21,9 +21,62 @@
+ #include "validation.h"
+ 
+ #define PATH_CAP 32768
++#define PATH_GUARD_CAP 64
+ static FILE *report;
+ static const struct dock_client_layout *client_layout;
+ 
++/* Pin each directory entry used to resolve the DLL, as well as the file.
++ * A digest of an open file is not enough if a junction or symlink in its path
++ * can be retargeted before LoadLibraryExW resolves that path again. Only
++ * ordinary local DOS paths are accepted for credential-bearing sessions.
++ */
++struct path_guard { HANDLE directories[PATH_GUARD_CAP]; unsigned count; HANDLE file; };
++
++static void close_path_guard(struct path_guard *guard)
++{
++    if (guard->file != INVALID_HANDLE_VALUE) CloseHandle(guard->file);
++    while (guard->count) CloseHandle(guard->directories[--guard->count]);
++    guard->file = INVALID_HANDLE_VALUE;
++}
++
++static bool open_guarded_client(const wchar_t *path, struct path_guard *guard)
++{
++    wchar_t prefix[PATH_CAP];
++    size_t length = wcslen(path);
++    if (length < 4 || length >= PATH_CAP || path[1] != L':' || path[2] != L'\\') return false;
++    if (!((path[0] >= L'A' && path[0] <= L'Z') ||
++          (path[0] >= L'a' && path[0] <= L'z'))) return false;
++    for (size_t start = 3, i = 3; i <= length; ++i) {
++        wchar_t c = path[i];
++        if (c == L'/' || (c == L':' && i > 1)) return false;
++        if (c != L'\\' && c != L'\0') continue;
++        size_t part = i - start;
++        if (!part || (part == 1 && path[start] == L'.') ||
++            (part == 2 && path[start] == L'.' && path[start + 1] == L'.') ||
++            path[i - 1] == L'.' || path[i - 1] == L' ') return false;
++        if (c == L'\\') {
++            if (guard->count == PATH_GUARD_CAP) return false;
++            wmemcpy(prefix, path, i);
++            prefix[i] = L'\0';
++            HANDLE directory = CreateFileW(prefix, FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
++                NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
++            if (directory == INVALID_HANDLE_VALUE) return false;
++            guard->directories[guard->count++] = directory;
++            BY_HANDLE_FILE_INFORMATION info;
++            if (!GetFileInformationByHandle(directory, &info) ||
++                !(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
++                (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) return false;
++            start = i + 1;
++        }
++    }
++    guard->file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
++                              FILE_FLAG_OPEN_REPARSE_POINT, NULL);
++    if (guard->file == INVALID_HANDLE_VALUE) return false;
++    BY_HANDLE_FILE_INFORMATION info;
++    return GetFileInformationByHandle(guard->file, &info) &&
++           !(info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT));
++}
++
+ static void event(const char *stage, int32_t value)
+ {
+     const char *round = !strncmp(stage, "install-scm", 11) ? "ml2014" :
+@@ -69,6 +122,8 @@ static bool client_directory(wchar_t *directory)
+         (directory[2] != L'\\' && directory[2] != L'/')) return false;
+     if (!((directory[0] >= L'A' && directory[0] <= L'Z') ||
+           (directory[0] >= L'a' && directory[0] <= L'z'))) return false;
++    for (size_t i = 2; i < length; ++i)
++        if (directory[i] == L'/') directory[i] = L'\\';
+     return true;
+ }
+ 
+@@ -188,48 +243,19 @@ static bool shutdown_client(void *client)
+     return ((sh_shutdown_fn)methods[23])(client);
+ }
+ 
+-#define SH_INSTALL_SCM_STEP_MS 20000   /* ml2015 */
+-static volatile int32_t install_scm_outcome;
+-
+-static DWORD WINAPI install_scm_worker(void *unused)
+-{
+-    (void)unused;
+-    install_scm_outcome = sh_install_scm_start(&host_observer);
+-    return 0;
+-}
+-
+ int main(int argc, char **argv)
+ {
+     static wchar_t directory[PATH_CAP], path[PATH_CAP];
+-    HANDLE mutex = NULL, file = INVALID_HANDLE_VALUE;
++    HANDLE mutex = NULL;
++    struct path_guard client_path = {.file = INVALID_HANDLE_VALUE};
+     void *public_client = NULL;
+     int result = 20;
+ 
+-    /* ml2014: Madeira's one-time-install batch runs this before a game's
+-     * installers. No Steam client is loaded; the one stdout line ("services
+-     * started|already|failed|off") goes to the batch's result file. Exit 0
+-     * always: installers run either way.
+-     */
++    /* This audit build does not start a service manager for game installers.
++     * A previously registered service has not been independently verified.
++     * Keep the batch protocol so installation can report the limitation. */
+     if (argc == 2 && !strcmp(argv[1], "--start-services")) {
+-        /* ml2015: a service manager that never answered its RPC pipe left
+-         * OpenSCManager blocked, and the batch (and the game) waited forever.
+-         * The step runs on a worker thread for at most SH_INSTALL_SCM_STEP_MS;
+-         * then it reports "services timeout" and this process ends at once
+-         * (the blocked call may hold loader or RPC locks, so no exit cleanup).
+-         */
+-        HANDLE worker = CreateThread(NULL, 0, install_scm_worker, NULL, 0, NULL);
+-        if (!worker) {
+-            printf("services %s\n", sh_install_scm_word(sh_install_scm_start(&host_observer)));
+-            fflush(stdout);
+-            return 0;
+-        }
+-        if (WaitForSingleObject(worker, SH_INSTALL_SCM_STEP_MS) != WAIT_OBJECT_0) {
+-            printf("services timeout\n");
+-            fflush(stdout);
+-            TerminateProcess(GetCurrentProcess(), 0);
+-        }
+-        CloseHandle(worker);
+-        printf("services %s\n", sh_install_scm_word(install_scm_outcome));
++        printf("services off\n");
+         fflush(stdout);
+         return 0;
+     }
+@@ -238,6 +264,7 @@ int main(int argc, char **argv)
+         event("disabled-set-MADEIRA_STEAM_HOST_PROBE", 0);
+         return 2;
+     }
++    const bool session_mode = enabled(L"MADEIRA_STEAM_HOST_SESSION");
+     /* This log is separate from Steam's own logs and contains no tokens,
+      * usernames, SteamIDs, paths, environment dump, or callback payloads.
+      */
+@@ -264,11 +291,18 @@ int main(int argc, char **argv)
+ #else
+     wcscat(path, L"\\steamclient.dll");
+ #endif
+-    file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+-    if (file == INVALID_HANDLE_VALUE || !identify_client(file)) {
++    if (!open_guarded_client(path, &client_path) || !identify_client(client_path.file)) {
+         event("client-file-or-identity-error", (int32_t)GetLastError());
+         goto done;
+     }
++    /* A session carries a one-use Steam credential. Reject an unknown client
++     * before LoadLibraryExW can execute its initialization code. Bootstrap
++     * probes remain available for inspecting a new client without a login. */
++    if (session_mode && !client_layout) {
++        event("session-unsupported-client", 1);
++        result = 30;
++        goto done;
++    }
+     if (!SetCurrentDirectoryW(directory)) {
+         event("client-working-directory-error", (int32_t)GetLastError());
+         goto done;
+@@ -305,7 +339,7 @@ int main(int argc, char **argv)
+     event("engine-factory-result", factory_result);
+     if (!engine) goto done;
+ 
+-    if (enabled(L"MADEIRA_STEAM_HOST_SESSION")) {
++    if (session_mode) {
+         result = sh_session(module, engine, &api, &host_observer, client_layout);
+     } else if (enabled(L"MADEIRA_STEAM_HOST_BOOTSTRAP")) {
+         result = sh_probe_bootstrap(&api, &host_observer);
+@@ -329,10 +363,10 @@ done:
+      * leftover service process cannot keep the app's session alive.
+      */
+     sh_ceg_scm_release(&host_observer);
+-    if (!enabled(L"MADEIRA_STEAM_HOST_SESSION"))
++    if (!session_mode)
+         event("ownership-unchecked-game-launch-disabled", 1);
+     event("probe-result", result);
+-    if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
++    close_path_guard(&client_path);
+     if (mutex) CloseHandle(mutex);
+     if (report) fclose(report);
+     return result;
+diff --git a/tools/check-privacy.py b/tools/check-privacy.py
+index 99b2215..705ea58 100644
+--- a/tools/check-privacy.py
++++ b/tools/check-privacy.py
+@@ -20,6 +20,7 @@ Public Madeira's .githooks/pre-commit and pre-push apply the same rules to
+ added lines. Keep the patterns in sync when changing either copy.
+ """
+ from pathlib import Path
++import hashlib
+ import re
+ import subprocess
+ import sys
+@@ -158,8 +159,11 @@ def main(argv):
+         paths = argv or git('ls-files').decode().splitlines()
+         findings = list(scan_worktree(paths))
+         scope = f'{len(paths)} files'
+-    for path, number, rule, value in findings:
+-        print(f'{path}:{number}: {rule}: {value}')
++    for path, number, rule, _value in findings:
++        # The filename itself may be an ssfn login cache or a personal path.
++        # A short digest lets maintainers locate it without printing it.
++        file_id = hashlib.sha256(path.encode('utf-8')).hexdigest()[:12]
++        print(f'file-sha256={file_id}:{number}: {rule}: [REDACTED]')
+     if findings:
+         print(f'FAIL: {len(findings)} secret/personal-data finding(s) in {scope}', file=sys.stderr)
+         return 1
