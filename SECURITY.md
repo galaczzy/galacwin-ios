@@ -2,17 +2,16 @@
 
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
-atribuciones. **La compilación de auditoría aislada de
-[Actions #41391432408](https://github.com/galaczzy/galacwin-ios/actions/runs/41391432408)
-terminó correctamente el 2026-11-02, sin cuentas ni secretos personales. El
-artefacto público contiene únicamente un IPA cifrado para la clave guardada
-fuera del repositorio. El IPA descifrado pasó la verificación estática local.
-ClamAV 1.5.4 no halló firmas de malware conocidas en una pasada completa, pero
-sí señaló `PUA.Win.Packer.Embedpe-3` en el `kernel32.dll` ARM64EC construido de
-Wine. El usuario confirmó la instalación en un iPad Pro M5 y una apertura sin
-Wi-Fi hasta la biblioteca, sin avisos ni permisos solicitados. JIT, juegos y
-uso con cuentas personales siguen sin validarse.** Una revisión de
-código y un resultado de antivirus no pueden demostrar ausencia absoluta de malware.
+atribuciones. **El IPA de auditoría v4 del commit
+`806f3d2494d63c435c43420dcb7d4dd41a5d3c5b` pasó la verificación de
+integridad y una pasada completa de ClamAV 1.5.4 sin detecciones de malware
+conocido. Con PUA activadas sólo apareció la alerta ya investigada del
+`kernel32.dll` ARM64EC de Wine. El usuario confirmó su instalación y arranque
+sin Wi-Fi en un iPad Pro M5 y que la prueba aislada de JIT devolvió 42. Juegos
+y uso con cuentas personales siguen sin probarse.** Una revisión de código,
+un resultado antivirus y una prueba en dispositivo no pueden demostrar ausencia
+absoluta de malware. El artefacto público de Actions contiene únicamente un
+IPA cifrado para una clave guardada fuera del repositorio.
 
 En una apertura separada de varios minutos en la biblioteca con Wi-Fi, sin
 cuentas ni descargas, el usuario activó el Informe de privacidad de las apps
@@ -66,6 +65,24 @@ más de diez minutos; tras reiniciar la app, el segundo terminó correctamente.
 interfaz comunicada por el usuario: todavía no se ha probado la ejecución de
 código JIT ni de juegos, ni se ha instrumentado el dispositivo para validar
 el contenido DDI o el tráfico.
+
+El [IPA de auditoría v4](https://github.com/galaczzy/galacwin-ios/actions/runs/41492574330)
+del commit `806f3d2494d63c435c43420dcb7d4dd41a5d3c5b` añadió un botón manual
+para ejecutar una función ARM64 fija que devuelve 42. Su SHA-256 local,
+`24211e894ebc36fe191fa607ed7b731dcd10373dd7e037ec0fd9cb253fcf376b`,
+coincidió con el registrado por el runner antes de cifrarlo. El verificador
+independiente aprobó 1 432 entradas y los hashes de 577 archivos del runtime.
+ClamAV examinó 1.11 GiB: la pasada de malware terminó sin detecciones y la
+pasada PUA señaló sólo `PUA.Win.Packer.Embedpe-3`; el `kernel32.dll` extraído
+activó la misma firma y conserva el hash de v3. Una revisión de seguridad del
+cambio v4 terminó sin hallazgos reportables en su archivo modificado. El
+usuario informó que Sideloadly instaló v4, que la biblioteca abrió sin Wi-Fi
+y sin avisos, que LocalDevVPN y el emparejamiento estaban listos, y que «Check
+setup» y «Enable JIT» terminaron correctamente. Al pulsar una vez «Test JIT
+execution», GalacWin mostró «JIT execution passed: the generated function
+returned 42.» Esta observación valida una función generada en esa sesión; no
+valida juegos, otras rutas de JIT, el paquete vuelto a firmar ni ausencia
+absoluta de malware.
 
 ## Controles aplicados
 
@@ -134,8 +151,9 @@ el contenido DDI o el tráfico.
    código fuente de StikJIT y sus dependencias. La etiqueta 1.9.0 de StikJIT
    incluye un archivo `idevice` ya compilado; el IPA v3 lo sustituyó por uno
    reconstruido desde fuentes fijadas. El código actual llena y verifica la
-   caché DDI antes de invocar StikJIT. Los IPA v2 y v3 incorporan esa
-   protección, pero JIT aún se debe validar en el dispositivo; véanse
+   caché DDI antes de invocar StikJIT. Los IPA v2, v3 y v4 incorporan esa
+   protección. La prueba aislada JIT de v4 pasó en el dispositivo, pero falta
+   probar cargas de juego y otros recorridos de JIT; véanse
    [docs/STIKJIT_PROVENANCE.md](docs/STIKJIT_PROVENANCE.md) y
    [docs/JIT_DDI_PROVENANCE.md](docs/JIT_DDI_PROVENANCE.md). El inventario
    `security/upstream-binaries.csv` sólo registra hashes de la copia.
@@ -155,12 +173,13 @@ el contenido DDI o el tráfico.
    cuando se configura `remote`.
 6. Obtener, si se desea, confirmación del proveedor sobre la alerta PUA de
    ClamAV y ampliar las pruebas en el iPad con datos de prueba antes de
-   introducir cuentas personales. La instalación y la apertura sin Wi-Fi
-   hasta la biblioteca fueron confirmadas por el usuario, sin instrumentación
-   independiente del paquete vuelto a firmar por Sideloadly. La compilación
-   macOS/Xcode de auditoría, la verificación estática y una pasada antivirus
-   sin firmas de malware terminaron correctamente; ninguna de estas pruebas
-   demuestra seguridad de comportamiento en todas las funciones.
+   introducir cuentas personales. La instalación, la apertura sin Wi-Fi y la
+   ejecución de una función JIT fija fueron confirmadas por el usuario, sin
+   instrumentación independiente del paquete vuelto a firmar por Sideloadly.
+   La compilación macOS/Xcode de auditoría, la verificación estática y una
+   pasada antivirus sin firmas de malware terminaron correctamente; ninguna
+   de estas pruebas demuestra seguridad de comportamiento en todas las
+   funciones.
 
 La app ejecuta juegos de Windows dentro de su propio proceso. Un juego o
 instalador malicioso sigue siendo un riesgo independiente de la procedencia del
