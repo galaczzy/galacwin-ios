@@ -6,9 +6,9 @@ atribuciones. **El IPA de auditoría v5 del commit
 `8ead5c885e82fdd2cf7a5e1d08f243f7e019988a` pasó la verificación de
 integridad y una pasada completa de ClamAV 1.5.4 sin detecciones de malware
 conocido. Con PUA activadas sólo apareció la misma alerta ya investigada del
-`kernel32.dll` ARM64EC de Wine, que no cambió desde v4. La prueba en el iPad de
-v5 está pendiente. El usuario sí confirmó que v4 instaló, abrió sin Wi-Fi,
-ejecutó la prueba JIT que devolvió 42 y abrió Notepad en el escritorio Wine.
+`kernel32.dll` ARM64EC de Wine, que no cambió desde v4. El usuario confirmó que
+Sideloadly instaló v5, que la biblioteca abrió sin Wi-Fi y sin avisos, que la
+prueba aislada JIT devolvió 42 y que Notepad respondió en el escritorio Wine.
 Juegos y uso con cuentas personales siguen sin probarse.** Una revisión de código,
 un resultado antivirus y una prueba en dispositivo no pueden demostrar ausencia
 absoluta de malware. El artefacto público de Actions contiene únicamente un
@@ -113,8 +113,14 @@ sí lo incorpora: su SHA-256 local coincide con el registrado por el runner,
 `19228d7c70c56970a63b0945e3ad035a1e29ec372d28f1f99809dbb4a403a416`.
 El verificador estático aprobó 1 432 entradas y los hashes de 577 archivos del
 runtime. ClamAV examinó 1,11 GiB sin detecciones de malware conocido; con PUA
-activadas señaló sólo la firma anterior. Aún falta probar v5 en el iPad y
-completar el resto de la auditoría.
+activadas señaló sólo la firma anterior. El usuario informó que Sideloadly
+instaló v5, que llegó a la biblioteca sin Wi-Fi y sin avisos, que LocalDevVPN
+y el emparejamiento estaban listos, que «Check setup» terminó correctamente,
+que «Enable JIT» se adjuntó y que la prueba de ejecución devolvió 42. También
+abrió el escritorio Wine y usó Notepad sin guardar un archivo. Apareció el
+mismo aviso de memoria JIT pequeña de v4. Falta probar juegos, cuentas
+personales, la ruta de Dock con credenciales y completar el resto de la
+auditoría.
 
 ## Controles aplicados
 
