@@ -93,8 +93,9 @@ código y un resultado de antivirus no pueden demostrar ausencia absoluta de mal
    prototipo antes de exponerlo en una red; el lanzador de prueba ahora usa
    loopback por defecto, pero el cliente de la app aún usa TCP sin cifrar
    cuando se configura `remote`.
-6. Investigar la alerta PUA de ClamAV y probar el IPA en un iPad con datos de
-   prueba antes de introducir cuentas personales. La compilación macOS/Xcode
+6. Obtener, si se desea, confirmación del proveedor sobre la alerta PUA de
+   ClamAV y probar el IPA en un iPad con datos de prueba antes de introducir
+   cuentas personales. La compilación macOS/Xcode
    de auditoría, la verificación estática y una pasada antivirus sin firmas
    de malware terminaron correctamente; no demuestran seguridad de
    comportamiento en el dispositivo.
@@ -122,8 +123,14 @@ IPA. No se han ejecutado juegos ni instaladores de terceros en esta etapa.
   `0x8664` y las secciones híbridas son compatibles con un PE ARM64EC; esto
   hace plausible una detección heurística. El DLL rastreado antes de la
   compilación tiene un hash distinto, pero activa la misma firma; en ambos la
-  secuencia coincidente contiene relleno seguido de `KERNEL32.`. Es evidencia
-  de que la regla reconoce el formato, pero no demuestra que sea falsa.
+  secuencia coincidente contiene relleno seguido de `KERNEL32.`. El código
+  fuente de `dlls/kernel32` difiere de Wine 11.4 solo en `heap.c`,
+  `kernel32.spec` y `sync.c`: 17 líneas añadidas y 29 eliminadas para ajustes
+  de memoria y funciones de reloj. El PE importa únicamente `kernelbase.dll`
+  y `ntdll.dll`. La [documentación de ClamAV](https://docs.clamav.net/faq/faq-pua.html)
+  advierte que sus reglas PUA pueden
+  producir más falsos positivos. Esta alerta concreta parece un falso positivo
+  del formato, pero la evidencia no certifica el resto del IPA.
 
 ## Evidencia local
 
