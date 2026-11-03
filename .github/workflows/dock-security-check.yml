@@ -1,0 +1,34 @@
+name: Check Dock security patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Fetch fixed Dock source
+        run: git submodule update --init --depth 1 madeira-dock
+      - name: Compile patched Dock and run source checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-mingw-w64-x86-64
+          test "$(git -C madeira-dock rev-parse HEAD)" = 8c98616a68c45857c1b0fd1bc58268249b3aa3aa
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir "$work/source"
+          git -C madeira-dock archive HEAD | tar -xf - -C "$work/source"
+          (cd "$work/source" && git apply --check "$GITHUB_WORKSPACE/build/madeira-dock/security-hardening.patch" && git apply "$GITHUB_WORKSPACE/build/madeira-dock/security-hardening.patch")
+          (cd "$work/source" && bash tools/check.sh)
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -Wno-cast-function-type \
+            -o "$work/dockhost.exe" "$work"/source/src/*.c -ladvapi32
+          file "$work/dockhost.exe"

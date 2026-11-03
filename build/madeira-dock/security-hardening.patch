@@ -18,10 +18,10 @@ index 8aed4e1..00d427a 100644
          !method_is(module, engine, 33, layout->engine_result) ||
          !method_is(module, client_user, 67, layout->running)) return 40;
 diff --git a/src/main.c b/src/main.c
-index 2ab32ce..9216c46 100644
+index 2ab32ce..f0807b6 100644
 --- a/src/main.c
 +++ b/src/main.c
-@@ -21,9 +21,62 @@
+@@ -21,9 +21,101 @@
  #include "validation.h"
  
  #define PATH_CAP 32768
@@ -81,10 +81,49 @@ index 2ab32ce..9216c46 100644
 +           !(info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT));
 +}
 +
++static bool sha256_file(HANDLE file, char hex[65])
++{
++    HCRYPTPROV provider = 0;
++    HCRYPTHASH hash = 0;
++    unsigned char buffer[32768], digest[32];
++    DWORD read = 0, size = sizeof(digest);
++    LARGE_INTEGER offset = {.QuadPart = 0};
++    bool ok = false;
++    if (!SetFilePointerEx(file, offset, NULL, FILE_BEGIN) ||
++        !CryptAcquireContextW(&provider, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) ||
++        !CryptCreateHash(provider, CALG_SHA_256, 0, 0, &hash)) goto done;
++    for (;;) {
++        if (!ReadFile(file, buffer, sizeof(buffer), &read, NULL)) goto done;
++        if (!read) break;
++        if (!CryptHashData(hash, buffer, read, 0)) goto done;
++    }
++    if (!CryptGetHashParam(hash, HP_HASHVAL, digest, &size, 0) || size != 32) goto done;
++    for (unsigned i = 0; i < 32; ++i) sprintf(hex + i * 2, "%02x", digest[i]);
++    hex[64] = '\0';
++    ok = true;
++done:
++    if (hash) CryptDestroyHash(hash);
++    if (provider) CryptReleaseContext(provider, 0);
++    return ok;
++}
++
++static bool verify_dependency(const wchar_t *directory, const wchar_t *name,
++                              const char *expected, struct path_guard *guard)
++{
++    wchar_t path[PATH_CAP];
++    char actual[65];
++    if (wcslen(directory) + wcslen(name) + 2 >= PATH_CAP) return false;
++    wcscpy(path, directory);
++    wcscat(path, L"\\");
++    wcscat(path, name);
++    return open_guarded_client(path, guard) &&
++           sha256_file(guard->file, actual) && !strcmp(actual, expected);
++}
++
  static void event(const char *stage, int32_t value)
  {
      const char *round = !strncmp(stage, "install-scm", 11) ? "ml2014" :
-@@ -69,6 +122,8 @@ static bool client_directory(wchar_t *directory)
+@@ -69,6 +161,8 @@ static bool client_directory(wchar_t *directory)
          (directory[2] != L'\\' && directory[2] != L'/')) return false;
      if (!((directory[0] >= L'A' && directory[0] <= L'Z') ||
            (directory[0] >= L'a' && directory[0] <= L'z'))) return false;
@@ -93,7 +132,45 @@ index 2ab32ce..9216c46 100644
      return true;
  }
  
-@@ -188,48 +243,19 @@ static bool shutdown_client(void *client)
+@@ -127,23 +221,8 @@ static bool identify_client(HANDLE file)
+      * not an Authenticode check and is not proof that a file came from Valve.
+      * The open handle disallows writes/deletes while this probe uses the DLL.
+      */
+-    HCRYPTPROV provider = 0;
+-    HCRYPTHASH hash = 0;
+-    unsigned char buffer[32768], digest[32];
+     char hex[65];
+-    DWORD size = sizeof(digest);
+-    bool ok = false;
+-    offset.QuadPart = 0;
+-    if (!SetFilePointerEx(file, offset, NULL, FILE_BEGIN) ||
+-        !CryptAcquireContextW(&provider, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) ||
+-        !CryptCreateHash(provider, CALG_SHA_256, 0, 0, &hash)) goto done;
+-    for (;;) {
+-        if (!ReadFile(file, buffer, sizeof(buffer), &read, NULL)) goto done;
+-        if (!read) break;
+-        if (!CryptHashData(hash, buffer, read, 0)) goto done;
+-    }
+-    if (!CryptGetHashParam(hash, HP_HASHVAL, digest, &size, 0) || size != 32) goto done;
+-    for (unsigned i = 0; i < 32; ++i) sprintf(hex + i * 2, "%02x", digest[i]);
++    if (!sha256_file(file, hex)) return false;
+     client_layout = dock_client_layout(hex);
+     if (client_layout && client_layout->revision == 202601) {
+         const char *compat = getenv("MADEIRA_DOCK_CLIENT_202601");
+@@ -156,11 +235,7 @@ static bool identify_client(HANDLE file)
+         fprintf(report, "[steam-host] ml1820 client-sha256=%s\n", hex);
+         fflush(report);
+     }
+-    ok = true;
+-done:
+-    if (hash) CryptDestroyHash(hash);
+-    if (provider) CryptReleaseContext(provider, 0);
+-    return ok;
++    return true;
+ }
+ 
+ static FARPROC symbol(HMODULE module, const char *name)
+@@ -188,48 +263,22 @@ static bool shutdown_client(void *client)
      return ((sh_shutdown_fn)methods[23])(client);
  }
  
@@ -113,6 +190,9 @@ index 2ab32ce..9216c46 100644
 -    HANDLE mutex = NULL, file = INVALID_HANDLE_VALUE;
 +    HANDLE mutex = NULL;
 +    struct path_guard client_path = {.file = INVALID_HANDLE_VALUE};
++    struct path_guard dependency_paths[2] = {
++        {.file = INVALID_HANDLE_VALUE}, {.file = INVALID_HANDLE_VALUE}
++    };
      void *public_client = NULL;
      int result = 20;
  
@@ -148,7 +228,7 @@ index 2ab32ce..9216c46 100644
          fflush(stdout);
          return 0;
      }
-@@ -238,6 +264,7 @@ int main(int argc, char **argv)
+@@ -238,6 +287,7 @@ int main(int argc, char **argv)
          event("disabled-set-MADEIRA_STEAM_HOST_PROBE", 0);
          return 2;
      }
@@ -156,7 +236,7 @@ index 2ab32ce..9216c46 100644
      /* This log is separate from Steam's own logs and contains no tokens,
       * usernames, SteamIDs, paths, environment dump, or callback payloads.
       */
-@@ -264,11 +291,18 @@ int main(int argc, char **argv)
+@@ -264,11 +314,41 @@ int main(int argc, char **argv)
  #else
      wcscat(path, L"\\steamclient.dll");
  #endif
@@ -174,10 +254,33 @@ index 2ab32ce..9216c46 100644
 +        result = 30;
 +        goto done;
 +    }
++    /* The pinned Steam client imports these two DLLs from its own directory.
++     * Loading the parent also executes dependency initialization code. Match
++     * the exact files from the SHA-256 pinned Valve package and hold their
++     * file and path handles until the session ends. A 32-bit session has no
++     * dependency allowlist in this audit build and is rejected. */
++    if (session_mode) {
++#ifdef _WIN64
++        if (!verify_dependency(directory, L"tier0_s64.dll",
++                               "af89cb6e94b20a5660d8f33427460fcd3b5e43e16b13372321d09cebab1288b8",
++                               &dependency_paths[0]) ||
++            !verify_dependency(directory, L"vstdlib_s64.dll",
++                               "9bb287b195f0a246f68ea462371178d9a2ebc23b03df295606ef189910aee2d2",
++                               &dependency_paths[1])) {
++            event("session-dependency-identity-error", 1);
++            result = 30;
++            goto done;
++        }
++#else
++        event("session-dependency-architecture-unsupported", 1);
++        result = 30;
++        goto done;
++#endif
++    }
      if (!SetCurrentDirectoryW(directory)) {
          event("client-working-directory-error", (int32_t)GetLastError());
          goto done;
-@@ -305,7 +339,7 @@ int main(int argc, char **argv)
+@@ -305,7 +385,7 @@ int main(int argc, char **argv)
      event("engine-factory-result", factory_result);
      if (!engine) goto done;
  
@@ -186,7 +289,7 @@ index 2ab32ce..9216c46 100644
          result = sh_session(module, engine, &api, &host_observer, client_layout);
      } else if (enabled(L"MADEIRA_STEAM_HOST_BOOTSTRAP")) {
          result = sh_probe_bootstrap(&api, &host_observer);
-@@ -329,10 +363,10 @@ done:
+@@ -329,10 +409,11 @@ done:
       * leftover service process cannot keep the app's session alive.
       */
      sh_ceg_scm_release(&host_observer);
@@ -195,6 +298,7 @@ index 2ab32ce..9216c46 100644
          event("ownership-unchecked-game-launch-disabled", 1);
      event("probe-result", result);
 -    if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
++    for (unsigned i = 0; i < 2; ++i) close_path_guard(&dependency_paths[i]);
 +    close_path_guard(&client_path);
      if (mutex) CloseHandle(mutex);
      if (report) fclose(report);
