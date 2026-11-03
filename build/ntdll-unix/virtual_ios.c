@@ -22808,11 +22808,12 @@ static void *get_host_addr_space_limit(void)
          * hint to be honoured. It is EXCLUSIVE, which is what is_beyond_limit()
          * wants, matching the ml122 note above.
          *
-         * Only ever RAISE the walk's answer, never lower it: the walk is proven
-         * on hardware, and a device reporting a small or bogus max_address must
-         * not shrink a limit that already works. Both values are logged so the
-         * two can be compared on any device. */
+         * A kernel-reported smaller limit is accepted only if the independent
+         * fixed-allocation probe finds the same 64 KB boundary. That agreement
+         * prevents advertising the unreachable tail of a power-of-two walk
+         * while preserving the old answer on devices with a bogus max_address. */
         void *walked = (void *)(addr << 1);
+        UINT_PTR probed_top = 0;
         task_vm_info_data_t vmi;
         mach_msg_type_number_t cnt = TASK_VM_INFO_COUNT;
 
@@ -22836,6 +22837,7 @@ static void *get_host_addr_space_limit(void)
                 if (kr != KERN_INVALID_ADDRESS) lo = mid;
                 else hi = mid;
             }
+            probed_top = lo;
             dprintf( 2, "[va-limit] ml1310 probed top=%p (64 KB steps) walk=%p: %s\n", (void *)lo, walked,
                      (void *)lo <= walked ? "the walk covers the whole map"
                                           : "the walk UNDER-reads the map (kernel max decides below)" );
@@ -22846,8 +22848,12 @@ static void *get_host_addr_space_limit(void)
             void *kern = (void *)(uintptr_t)vmi.max_address;
 
             dprintf( 2, "[va-limit] ml749 walk=%p kernel_max=%p -> %s\n",
-                     walked, kern, kern > walked ? "USING KERNEL (walk underestimated)" : "keeping walk" );
+                     walked, kern, kern > walked ? "USING KERNEL (walk underestimated)" :
+                     (uintptr_t)kern == probed_top && kern < walked ?
+                     "USING KERNEL (lower ceiling verified by fixed probe)" : "keeping walk" );
             if (kern > walked && (uintptr_t)kern >= 0x100000000ULL) return kern;
+            if (kern < walked && (uintptr_t)kern >= 0x100000000ULL &&
+                (uintptr_t)kern == probed_top) return kern;
         }
         else dprintf( 2, "[va-limit] ml749 walk=%p kernel_max=UNAVAILABLE -> keeping walk\n", walked );
 
@@ -30452,13 +30458,17 @@ NTSTATUS WINAPI NtAllocateVirtualMemory( HANDLE process, PVOID *ret, ULONG_PTR z
          * it (jumbo_hint/jumbo_size are captured before *ret and *size_ptr are
          * overwritten), the status, and the last raw Mach result.
          *
-         * Uncapped for the first 64 failures, then every 64th: a single failure
-         * is the interesting one, and a storm should not hide it. */
+         * Log the first 64 failures, then every 1000th through 100000 and
+         * every 100000th thereafter. A game probing beyond the iPad's actual
+         * VA ceiling produced over 67 million failed requests and the old
+         * every-64th rule wrote more than a million lines (191 MB), which
+         * competed with the game for memory and crashed Swift's log summary.
+         * The status and stage of the storm remain visible without the I/O. */
         if (st != STATUS_SUCCESS)
         {
             static unsigned long af_n;
             unsigned long n = ++af_n;
-            if (n <= 64 || (n % 64) == 0)
+            if (n <= 64 || (n <= 100000 ? !(n % 1000) : !(n % 100000)))
                 dprintf( 2, "[alloc-fail] ml814 #%lu status=%08x hint=%p size=0x%llx type=0x%x "
                             "protect=0x%x tid=%04x | STAGE=%s err=%d at 0x%llx+0x%llx\n",
                          n, (unsigned)st, jumbo_hint, (unsigned long long)jumbo_size,
