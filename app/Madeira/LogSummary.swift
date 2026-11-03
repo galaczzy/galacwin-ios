@@ -21,6 +21,9 @@ import Foundation
 /// app launch from madeira-log.prev.txt. Reading the log changes nothing.
 enum LogSummary {
     static let fileName = "madeira-summary.txt"
+    // Parsing a very large guest log while Wine is still releasing its memory
+    // can kill the app. Keep the original log and write a small, honest notice.
+    static let maxAutomaticInputBytes: UInt64 = 64 << 20
 
     /// DLLs a session looks for and runs fine without (docs: the plan's "harmless
     /// warnings" list): Wine's other display drivers, Windows' sign-in packages,
@@ -362,6 +365,21 @@ enum LogSummary {
     /// in it (the app was opened and closed) leaves the last summary in place.
     @discardableResult
     static func write(from log: URL, source: String) -> Bool {
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: log.path),
+           let size = attributes[.size] as? NSNumber,
+           size.uint64Value > maxAutomaticInputBytes {
+            let out = log.deletingLastPathComponent().appendingPathComponent(fileName)
+            let notice = "=== Madeira session summary ===\nFrom \(source).\n\n" +
+                "Automatic summary skipped: the log is \(size.uint64Value >> 20) MiB, " +
+                "above the 64 MiB safe limit. The full log is preserved.\n"
+            do {
+                try notice.write(to: out, atomically: true, encoding: .utf8)
+                return true
+            } catch {
+                fputs("[log-summary] could not write \(fileName): \(error.localizedDescription)\n", stderr)
+                return false
+            }
+        }
         guard let f = facts(fromFileAt: log), f.sawSession else { return false }
         let out = log.deletingLastPathComponent().appendingPathComponent(fileName)
         do {
