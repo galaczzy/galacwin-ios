@@ -108,7 +108,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command_line, i
     if (!presenter) return report("PresenterCreate", E_FAIL);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtv;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap, &rtv);
+    heap->lpVtbl->GetCPUDescriptorHandleForHeapStart(heap, &rtv);
     const FLOAT magenta[4] = {1.0f, 0.0f, 1.0f, 1.0f};
     UINT64 fence_value = 0;
     unsigned int frames = 0;

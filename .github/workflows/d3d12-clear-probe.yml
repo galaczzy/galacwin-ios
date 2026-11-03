@@ -17,7 +17,7 @@ jobs:
       - name: Verify reviewed source
         run: |
           printf '%s  %s\n' \
-            a893aa5be72e4addec8042f4de39fd1ee13c40d57f1f7482961c24be40d79152 \
+            5c7b95ecf3631951198e63c0a9dbf3e084a8fe5efecc5f405a1f744e3b7d9c31 \
             tests/windows/galacwin-d3d12-clear-probe.c | shasum -a 256 -c -
       - name: Download SHA-256-pinned compiler
         run: bash tools/build/setup-llvm-mingw.sh
