@@ -46,6 +46,15 @@ transport (`SteamAuthAPI`) turns those into specific errors (wrong password or
 account, wrong Steam Guard code, rate limit, disabled account, expired
 request) instead of polling an empty session.
 
+The authentication transport accepts only the five methods listed above,
+uses an ephemeral session without a cookie or credential store, and requires
+HTTPS to `api.steampowered.com` for both redirects and the final response.
+It does not send authentication requests to a redirected third-party host.
+QR links, including rotated links, must match the current
+`https://s.team/q/1/<numeric challenge>` format without credentials, query
+strings or fragments before they are displayed. A changed format fails closed
+until it can be reviewed.
+
 The token requested is a Steam *client* token
 (`k_EAuthTokenPlatformType_SteamClient`, persistent session), which is what
 Valve's client accepts for its own sign-in.

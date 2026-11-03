@@ -1,4 +1,4 @@
-name: Check Dock security patch
+name: Check Steam security hardening
 
 on:
   workflow_dispatch:
@@ -32,3 +32,13 @@ jobs:
           x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -Wno-cast-function-type \
             -o "$work/dockhost.exe" "$work"/source/src/*.c -ladvapi32
           file "$work/dockhost.exe"
+
+  steam_auth:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check Steam sign-in transport and QR validation
+        run: python3 tests/host/check-steam-signin-native.py

@@ -98,6 +98,7 @@ require('Button("Steam sign-in")' in content and 'SteamSignIn.isEnabled' in cont
 # ---------------------------------------------------------------- Part B
 signin = (steam / 'SteamSignIn.swift').read_text()
 api = (steam / 'Auth/SteamAuthAPI.swift').read_text()
+qr_auth = (steam / 'Auth/SteamQRAuth.swift').read_text()
 stubs = r'''
 import Foundation
 #if canImport(FoundationNetworking)
@@ -116,6 +117,12 @@ final class SteamTokenStore {
 }
 '''
 api_source = api.replace('import Foundation\n', 'import Foundation\n#if canImport(FoundationNetworking)\nimport FoundationNetworking\n#endif\n', 1)
+# The production transport uses an ephemeral URLSession. Attach the local stub
+# only to the host-test copy so the test never contacts Steam.
+session_line = 'let configuration = URLSessionConfiguration.ephemeral'
+require(api_source.count(session_line) == 1, 'Steam auth transport creates one ephemeral session')
+api_source = api_source.replace(session_line, session_line + '\n        configuration.protocolClasses = [StubProtocol.self]', 1)
+qr_validation = block(qr_auth, 'static func validChallengeURL(')
 
 checks = r'''
 import Foundation
@@ -255,11 +262,19 @@ func expectError(_ expected: SteamError, _ label: String, _ run: () async throws
         _ = try await SteamAuthAPI.call("GetPasswordRSAPublicKey", body: Data([0xfb, 0xff]), httpMethod: "GET")
         require(StubProtocol.lastMethod == "GET" && StubProtocol.lastURL?.query == "input_protobuf_encoded=%2B%2F8%3D", "GET carries the protobuf in the query")
         StubProtocol.eresult = "5"
-        await expectError(.invalidCredentials, "HTTP 200 with x-eresult 5 is a wrong password") { try await SteamAuthAPI.call("X", body: Data()) }
+        await expectError(.invalidCredentials, "HTTP 200 with x-eresult 5 is a wrong password") { try await SteamAuthAPI.call("PollAuthSessionStatus", body: Data()) }
         StubProtocol.eresult = nil; StubProtocol.status = 429
-        await expectError(.rateLimited, "HTTP 429 is a rate limit") { try await SteamAuthAPI.call("X", body: Data()) }
+        await expectError(.rateLimited, "HTTP 429 is a rate limit") { try await SteamAuthAPI.call("PollAuthSessionStatus", body: Data()) }
         StubProtocol.status = 503
-        await expectError(.authenticationFailed("Steam sign-in is unavailable right now (HTTP 503)."), "other HTTP errors") { try await SteamAuthAPI.call("X", body: Data()) }
+        await expectError(.authenticationFailed("Steam sign-in is unavailable right now (HTTP 503)."), "other HTTP errors") { try await SteamAuthAPI.call("PollAuthSessionStatus", body: Data()) }
+        await expectError(.authenticationFailed("Steam sign-in request was rejected."), "unknown auth method is rejected") { try await SteamAuthAPI.call("Unknown", body: Data()) }
+
+        require(QRCheck.validChallengeURL("https://s.team/q/1/2372462679780599330"), "Steam QR challenge URL accepted")
+        for bad in ["http://s.team/q/1/2", "https://evil.example/q/1/2", "https://s.team.evil.example/q/1/2",
+                    "https://user@s.team/q/1/2", "https://s.team/q/1/2?next=evil", "https://s.team/other/2",
+                    "https://s.team/q/../other", "https://s.team/q/1/"] {
+            require(!QRCheck.validChallengeURL(bad), "QR challenge rejects \(bad)")
+        }
 
         // SteamSignIn: the Dock's view of the stored sign-in.
         func jwt(_ claims: String) -> String {
@@ -293,7 +308,7 @@ func expectError(_ expected: SteamError, _ label: String, _ run: () async throws
 
 with tempfile.TemporaryDirectory() as tmp:
     tmp = Path(tmp)
-    (tmp / 'stubs.swift').write_text(stubs + block(signin, 'enum SteamSignIn {'))
+    (tmp / 'stubs.swift').write_text(stubs + block(signin, 'enum SteamSignIn {') + '\nenum QRCheck {\n' + qr_validation + '\n}\n')
     (tmp / 'api.swift').write_text(api_source)
     (tmp / 'checks.swift').write_text(checks)
     sources = [tmp / 'stubs.swift', tmp / 'api.swift', tmp / 'checks.swift',

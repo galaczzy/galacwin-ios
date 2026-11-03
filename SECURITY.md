@@ -167,6 +167,16 @@ mismo aviso de memoria JIT pequeña de v4. Falta probar juegos, cuentas
 personales, la ruta de Dock con credenciales y completar el resto de la
 auditoría.
 
+Una revisión posterior del paquete de cliente de Valve fijado por SHA-256
+identificó dos DLL que `steamclient64.dll` carga directamente:
+`tier0_s64.dll` y `vstdlib_s64.dll`. El IPA v9 no comprueba sus hashes justo
+antes de cargar el cliente; el parche preparado para la siguiente compilación
+sí lo hará y mantendrá abiertos sus archivos y rutas durante la sesión.
+También limita las solicitudes de autenticación a métodos conocidos y a
+`api.steampowered.com` por HTTPS. La evidencia y los límites de esta revisión
+están en [docs/STEAM_CLIENT_DEPENDENCIES.md](docs/STEAM_CLIENT_DEPENDENCIES.md).
+No se ha iniciado sesión con una cuenta personal en las pruebas del iPad.
+
 ## Controles aplicados
 
 - El registro de inicio y el puente de Wine enumeran claves de `madeira.cfg`

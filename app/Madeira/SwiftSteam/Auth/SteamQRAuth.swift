@@ -21,6 +21,16 @@ typealias SteamImage = UIImage
 @MainActor
 class SteamQRAuth {
 
+    static func validChallengeURL(_ text: String) -> Bool {
+        guard text.utf8.count <= 512, let url = URLComponents(string: text),
+              url.scheme?.lowercased() == "https", url.host?.lowercased() == "s.team",
+              (url.port == nil || url.port == 443), url.user == nil, url.password == nil,
+              url.query == nil, url.fragment == nil else { return false }
+        let path = url.path.split(separator: "/", omittingEmptySubsequences: false)
+        return path.count == 4 && path[0].isEmpty && path[1] == "q" && path[2] == "1"
+            && UInt64(path[3]) != nil
+    }
+
     enum QRAuthState: Equatable {
         case idle
         case generating
@@ -55,9 +65,9 @@ class SteamQRAuth {
         let responseData = try await callSteamAuthAPI(method: "BeginAuthSessionViaQR", body: request.serialize())
         let response = try CAuthentication_BeginAuthSessionViaQR_Response.deserialize(from: responseData)
 
-        guard !response.challengeURL.isEmpty else {
-            authState = .failed("No challenge URL received")
-            throw SteamError.authenticationFailed("Empty challenge URL from Steam")
+        guard Self.validChallengeURL(response.challengeURL) else {
+            authState = .failed("Invalid Steam QR sign-in link")
+            throw SteamError.authenticationFailed("Steam sent an invalid QR sign-in link.")
         }
 
         clientID = response.clientID
@@ -90,6 +100,9 @@ class SteamQRAuth {
 
             // Update QR image if challenge URL changed
             if !pollResponse.newChallengeURL.isEmpty {
+                guard Self.validChallengeURL(pollResponse.newChallengeURL) else {
+                    throw SteamError.authenticationFailed("Steam sent an invalid QR sign-in link.")
+                }
                 let newImage = generateQRCode(from: pollResponse.newChallengeURL)
                 authState = .showingQR(image: newImage, url: pollResponse.newChallengeURL)
                 onNewChallenge?(newImage, pollResponse.newChallengeURL)

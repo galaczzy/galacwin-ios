@@ -9,6 +9,16 @@
 
 import Foundation
 
+private final class SteamAuthRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        let url = request.url
+        let allowed = url?.scheme == "https" && url?.host == "api.steampowered.com"
+            && (url?.port == nil || url?.port == 443) && url?.user == nil && url?.password == nil
+        completionHandler(allowed ? request : nil)
+    }
+}
+
 /// IAuthenticationService over HTTPS (api.steampowered.com), shared by the
 /// QR and password flows.
 ///
@@ -19,6 +29,12 @@ import Foundation
 /// mapped to a specific error. Request and response bodies are never logged.
 enum SteamAuthAPI {
     static func call(_ method: String, body: Data, httpMethod: String = "POST") async throws -> Data {
+        let allowedMethods: Set<String> = ["GetPasswordRSAPublicKey", "BeginAuthSessionViaCredentials",
+                                           "BeginAuthSessionViaQR", "UpdateAuthSessionWithSteamGuardCode",
+                                           "PollAuthSessionStatus"]
+        guard allowedMethods.contains(method), httpMethod == "POST" || httpMethod == "GET" else {
+            throw SteamError.authenticationFailed("Steam sign-in request was rejected.")
+        }
         let baseURL = "https://api.steampowered.com/IAuthenticationService/\(method)/v1/"
 
         // Percent-encode the base64 string. Base64 contains +, /, = — all need encoding
@@ -39,9 +55,19 @@ enum SteamAuthAPI {
         request.timeoutInterval = 20
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        let session = URLSession(configuration: configuration, delegate: SteamAuthRedirects(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw SteamError.authenticationFailed("Steam did not respond. Check your internet connection.")
+        }
+        guard let finalURL = http.url, finalURL.scheme == "https", finalURL.host == "api.steampowered.com",
+              (finalURL.port == nil || finalURL.port == 443), finalURL.user == nil,
+              finalURL.password == nil else {
+            throw SteamError.authenticationFailed("Steam sign-in was redirected outside Steam.")
         }
         if http.statusCode == 429 { throw SteamError.rateLimited }
         guard http.statusCode == 200 else {
