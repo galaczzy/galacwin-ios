@@ -16866,6 +16866,21 @@ static int ios_x64_image_nocopy_enabled(void)
     return cached;
 }
 
+/* A narrower opt-in for a Dock game whose own x64 image must keep its pool
+ * copy.  Only Steam's client DLLs in its installation root may use the
+ * no-copy path; a same-named DLL inside steamapps or a game directory must
+ * keep the ordinary copy.  Selection is checked at image mapping below. */
+static int ios_x64_image_nocopy_steam_enabled(void)
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char *s = getenv( "MADEIRA_X64_IMAGE_NOCOPY_STEAM" );
+        cached = (s && s[0] == '1' && !s[1]) ? 1 : 0;
+    }
+    return cached;
+}
+
 /* The request is host-page rounded (16 KB) while SizeOfImage is only 4 KB
  * aligned, so a last section's request ends up to 12 KB past the view: GTA V
  * Enhanced build 423 (2026-10-07 09:18), GTA5_Enhanced.exe 0x72d4840000+
@@ -16893,7 +16908,7 @@ static int ios_x64_image_is_host_data( const void *base, size_t size )
 #ifdef WINE_IOS
     struct file_view *view;
 
-    if (!ios_x64_image_nocopy_enabled()) return 0;
+    if (!ios_x64_image_nocopy_enabled() && !ios_x64_image_nocopy_steam_enabled()) return 0;
     if (!(view = find_view( base, 0 ))) return 0;
     if (!(view->protect & VPROT_X64DATA)) return 0;
     return ios_x64_image_view_covers( (uintptr_t)view->base, view->size, (uintptr_t)base, size );
@@ -17166,7 +17181,7 @@ static inline int mprotect_exec( void *base, size_t size, int unix_prot )
         static unsigned long x64_n;
         if (++x64_n <= 24 && !ios_in_mach_exc)
             dprintf( 2, "[x64-image] #%lu %p+0x%lx prot=%c%c%c -- pure-x64 image page, EXEC has no host "
-                        "meaning here (the emulator runs it at the PE VA); applying %c%c- (MADEIRA_X64_IMAGE_NOCOPY)\n",
+                        "meaning here (the emulator runs it at the PE VA); applying %c%c- (x64 no-copy policy)\n",
                      x64_n, base, (unsigned long)size,
                      (unix_prot & PROT_READ)  ? 'r' : '-',
                      (unix_prot & PROT_WRITE) ? 'w' : '-',
@@ -23267,6 +23282,39 @@ static int ios_image_file_is( const UNICODE_STRING *nt_name, const char *want )
     return 1;
 }
 
+/* The Steam-only policy is deliberately narrower than a basename match:
+ * Steam\steamclient64.dll and Steam\video64.dll are allowed, while a DLL
+ * anywhere below steamapps or in another directory is not.  nt_name is a
+ * counted UTF-16 string, so neither a terminator nor host wchar_t is needed. */
+static int ios_x64_image_nocopy_steam_selected( const UNICODE_STRING *nt_name )
+{
+    static const char parent[] = "steam";
+    size_t n, len, i;
+    const WCHAR *dir;
+
+    if (!ios_x64_image_nocopy_steam_enabled() || !nt_name || !nt_name->Buffer) return 0;
+    if (!ios_image_file_is( nt_name, "steamclient64.dll" ) &&
+        !ios_image_file_is( nt_name, "video64.dll" )) return 0;
+    len = nt_name->Length / sizeof(WCHAR);
+    n = len;
+    while (n && nt_name->Buffer[n - 1] != '\\' && nt_name->Buffer[n - 1] != '/') n--;
+    if (n < sizeof(parent) + 1) return 0; /* separator, five letters, separator */
+    dir = nt_name->Buffer + n - sizeof(parent) - 1;
+    if (dir[0] != '\\' && dir[0] != '/') return 0;
+    for (i = 0; i < sizeof(parent) - 1; i++)
+    {
+        WCHAR c = dir[i + 1];
+        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+        if (c != parent[i]) return 0;
+    }
+    return dir[sizeof(parent)] == '\\' || dir[sizeof(parent)] == '/';
+}
+
+static int ios_x64_image_nocopy_selected( const UNICODE_STRING *nt_name )
+{
+    return ios_x64_image_nocopy_enabled() || ios_x64_image_nocopy_steam_selected( nt_name );
+}
+
 static void ios_fft_arena_patch( char *base, const IMAGE_NT_HEADERS *nt, const IMAGE_SECTION_HEADER *sec,
                                  SIZE_T total_size, const UNICODE_STRING *nt_name )
 {
@@ -23489,7 +23537,7 @@ static NTSTATUS map_image_into_view( struct file_view *view, const UNICODE_STRIN
      * below (same test, VPROT_ARM64EC aside: ios_swap_image_flush re-checks the
      * mark) are noted as they are read; see ios_swap_image_note. */
     ios_swap_image_npend = 0;
-    ios_swap_image_armed = ios_swap_images_enabled() && ios_x64_image_nocopy_enabled() && !ios_map_resource_view &&
+    ios_swap_image_armed = ios_swap_images_enabled() && ios_x64_image_nocopy_selected( nt_name ) && !ios_map_resource_view &&
                            !ios_wow_base() && nt->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64 &&
                            nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC &&
                            !image_info->is_hybrid && !image_info->wine_builtin;
@@ -23760,7 +23808,7 @@ static NTSTATUS map_image_into_view( struct file_view *view, const UNICODE_STRIN
      * the section pass and the eager copy loop below see the mark (see
      * ios_x64_image_is_host_data). update_arm64ec_ranges has run: a hybrid
      * image carries VPROT_ARM64EC by now. */
-    if (ios_x64_image_nocopy_enabled() && !ios_map_resource_view && !ios_wow_base() &&
+    if (ios_x64_image_nocopy_selected( nt_name ) && !ios_map_resource_view && !ios_wow_base() &&
         nt->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64 &&
         nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC &&
         !(view->protect & VPROT_ARM64EC) && !image_info->is_hybrid && !image_info->wine_builtin)
@@ -23769,7 +23817,7 @@ static NTSTATUS map_image_into_view( struct file_view *view, const UNICODE_STRIN
         view->protect |= VPROT_X64DATA;
         if (x64_images++ < 64)
             dprintf( 2, "[x64-image] %s %p+0x%lx mapped without a pool copy (pure x64: the emulator runs "
-                        "it at the PE VA; MADEIRA_X64_IMAGE_NOCOPY)\n",
+                        "it at the PE VA; x64 no-copy policy)\n",
                      debugstr_us(nt_name), ptr, (unsigned long)total_size );
     }
     ios_fft_arena_patch( ptr, nt, sec, total_size, nt_name );   /* ml1299 */

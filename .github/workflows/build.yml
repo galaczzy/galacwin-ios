@@ -55,6 +55,7 @@ jobs:
           python3 tests/host/check-clean-bootstrap.py
           python3 tests/host/check-app-link-inputs.py
           python3 tests/host/check-jit-method.py
+          python3 tests/host/check-x64-image-nocopy.py
           python3 tests/host/check-remote-metal-disabled.py
           python3 tests/host/check-runtime-components.py
       - name: Check Steam connection recovery

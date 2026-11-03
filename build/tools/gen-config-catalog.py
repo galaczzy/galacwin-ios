@@ -104,6 +104,12 @@ OVERLAY = {
                         "image, as 32-bit programs already do, and its executable protections are applied without "
                         "EXEC. Frees the pool for hybrid DLL copies and code buffers. Hybrid images keep their "
                         "copy. Set it in the game's own file; restart the session after changing it."},
+    "env.MADEIRA_X64_IMAGE_NOCOPY_STEAM": {"category": "Memory & JIT pool",
+                "title": "Steam client DLLs without a JIT-pool copy", "kind": "bool", "default": "0",
+                "note": "Experimental; off by default. 1 skips JIT-pool copies only for pure-x64 "
+                        "steamclient64.dll and video64.dll directly in the Steam installation folder. Game "
+                        "executables and files under steamapps keep their copies. Use in one game's config "
+                        "to leave room for hybrid Direct3D DLLs; restart the app before testing."},
     "env.MADEIRA_FIXED_BASE_GUARD": {"category": "Memory & JIT pool", "title": "Keep 0x140000000 for a fixed-base game",
                 "kind": "bool", "default": "0",
                 "note": "Default off. 1: a resource-only image view (a version or resource query, e.g. the Rockstar "

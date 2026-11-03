@@ -19,7 +19,8 @@ Checks, without a Wine run:
   - mprotect_exec consults the mark after the ml1030 block and before the
     resource-only refusal and the JIT-pool arm, clears PROT_EXEC and never sets
     ios_jit_copy_refused;
-  - the switch is exactly "1" (compiled and run against a stub getenv);
+  - the original all-images switch remains exactly "1" (compiled against a stub getenv);
+  - Steam-only selection accepts only two DLLs directly in Steam's root;
   - the catalog overlay documents the key; the CI workflow runs this check.
 Needs python3 and a C compiler.
 """
@@ -50,7 +51,7 @@ assert flag > 0x0800, 'above the per-mapping flags that exist'
 # --- the mark in map_image_into_view ------------------------------------------
 mapper = function(native, 'static NTSTATUS map_image_into_view(')
 mark = mapper.index('view->protect |= VPROT_X64DATA;')
-cond_start = mapper.rindex('if (ios_x64_image_nocopy_enabled()', 0, mark)
+cond_start = mapper.rindex('if (ios_x64_image_nocopy_selected( nt_name )', 0, mark)
 cond = mapper[cond_start:mark]
 for need in ('!ios_map_resource_view', '!ios_wow_base()', 'nt->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64',
              'nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC', '!(view->protect & VPROT_ARM64EC)',
@@ -78,6 +79,7 @@ assert '!ios_in_mach_exc' in block, 'silent on the Mach exception thread (ml374)
 
 helper = function(native, 'static int ios_x64_image_is_host_data(')
 assert 'ios_x64_image_nocopy_enabled()' in helper
+assert 'ios_x64_image_nocopy_steam_enabled()' in helper
 # build 423: a host-page rounded request for the last section runs past a 4 KB
 # aligned SizeOfImage; the view must be found by its start, not by the range
 assert 'find_view( base, 0 )' in helper and 'find_view( base, size )' not in helper
@@ -149,13 +151,70 @@ with tempfile.TemporaryDirectory() as d:
         assert out == str(want), (case, out)
 print('PASS: MADEIRA_X64_IMAGE_NOCOPY is on for exactly "1"')
 
+# --- Steam-only policy, compiled against counted UTF-16 names ----------------
+file_is = function(native, 'static int ios_image_file_is(')
+steam_selected = function(native, 'static int ios_x64_image_nocopy_steam_selected(')
+selected = function(native, 'static int ios_x64_image_nocopy_selected(')
+policy_prog = r'''
+#include <stdio.h>
+#include <string.h>
+typedef unsigned short WCHAR;
+typedef struct { unsigned short Length; WCHAR *Buffer; } UNICODE_STRING;
+static int full_mode, steam_mode;
+static int ios_x64_image_nocopy_enabled(void) { return full_mode; }
+static int ios_x64_image_nocopy_steam_enabled(void) { return steam_mode; }
+''' + file_is + steam_selected + selected + r'''
+static int check(const char *path, int want)
+{
+    WCHAR buf[256];
+    UNICODE_STRING name;
+    size_t i, n = strlen(path);
+    if (n > 256) return 1;
+    for (i = 0; i < n; i++) buf[i] = (unsigned char)path[i];
+    name.Length = n * sizeof(WCHAR);
+    name.Buffer = buf; /* deliberately no terminator */
+    if (ios_x64_image_nocopy_selected(&name) == want) return 0;
+    printf("FAIL: %s\n", path);
+    return 1;
+}
+int main(void)
+{
+    int bad = 0;
+    steam_mode = 1;
+    bad |= check("\\??\\C:\\Program Files (x86)\\Steam\\steamclient64.dll", 1);
+    bad |= check("\\??\\C:\\Program Files (x86)\\STEAM\\VIDEO64.DLL", 1);
+    bad |= check("\\??\\C:\\Program Files (x86)\\Steam\\steamapps\\common\\SILENT HILL 2\\steamclient64.dll", 0);
+    bad |= check("\\??\\C:\\Program Files (x86)\\Other\\steamclient64.dll", 0);
+    bad |= check("\\??\\C:\\Program Files (x86)\\Steam\\SHProto-Win64-Shipping.exe", 0);
+    bad |= check("Steam\\steamclient64.dll", 0);
+    full_mode = 1;
+    bad |= check("\\??\\C:\\game\\SHProto-Win64-Shipping.exe", 1);
+    full_mode = 0; steam_mode = 0;
+    bad |= check("\\??\\C:\\Program Files (x86)\\Steam\\steamclient64.dll", 0);
+    return bad;
+}
+'''
+with tempfile.TemporaryDirectory() as d:
+    src = Path(d) / 'policy.c'
+    src.write_text(policy_prog)
+    exe = Path(d) / 'policy'
+    subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-fsanitize=undefined', '-o', str(exe), str(src)],
+                   check=True)
+    r = subprocess.run([str(exe)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+assert 'ios_x64_image_nocopy_selected( nt_name )' in mapper
+assert 'ios_swap_image_armed = ios_swap_images_enabled() && ios_x64_image_nocopy_selected( nt_name )' in mapper
+print('PASS: Steam-only policy excludes game images and same-named DLLs outside Steam root')
+
 # --- catalog and CI -----------------------------------------------------------
 gen = (root / 'build/tools/gen-config-catalog.py').read_text()
 assert '"env.MADEIRA_X64_IMAGE_NOCOPY"' in gen, 'catalog overlay'
+assert '"env.MADEIRA_X64_IMAGE_NOCOPY_STEAM"' in gen, 'Steam-only catalog overlay'
 swift = (root / 'app/Madeira/ConfigCatalog.generated.swift').read_text()
 assert 'env.MADEIRA_X64_IMAGE_NOCOPY' in swift, 'generated catalog carries the key'
-# The CI step exists only in the fork's workflow; upstream has no .github.
-if (root / '.github/workflows/build-ipa.yml').exists():
-    yml = (root / '.github/workflows/build-ipa.yml').read_text()
-    assert 'tests/host/check-x64-image-nocopy.py' in yml, 'CI gate'
+assert 'env.MADEIRA_X64_IMAGE_NOCOPY_STEAM' in swift, 'generated catalog carries the Steam-only key'
+# The fork's IPA workflow must run this check before packaging new code.
+if (root / '.github/workflows/build.yml').exists():
+    yml = (root / '.github/workflows/build.yml').read_text()
+    assert 'python3 tests/host/check-x64-image-nocopy.py' in yml, 'CI gate'
 print('PASS: [x64-image] pure-x64 images run from their PE view without a pool copy, behind MADEIRA_X64_IMAGE_NOCOPY')
