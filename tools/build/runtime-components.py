@@ -143,6 +143,21 @@ def missing_imports(files):
     return missing
 
 
+def check_early_crt_imports(files):
+    """Reject the eager CRT import cycle that crashes x64 startup (#495)."""
+    spec = importlib.util.spec_from_file_location('wine_pe', ROOT / 'tools/check-wine-media-dlls.py')
+    reader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reader)
+    for name in ('ucrtbase.dll', 'msvcrt.dll'):
+        data = files.get(name)
+        if data is None:
+            raise ValueError(f'arm64ec: missing critical CRT module: {name}')
+        pe = reader.PE(data)
+        eager = pe.imports() & {'advapi32.dll', 'user32.dll'}
+        if eager:
+            raise ValueError(f'arm64ec: {name} has eager imports that break x64 startup: {sorted(eager)}')
+
+
 def validate_manifest(name, manifest, read, sdk):
     if manifest.get('schema') != 1 or manifest.get('key') != input_key(name, sdk):
         raise ValueError(f'{name}: source or SDK does not match')
@@ -170,6 +185,7 @@ def validate_manifest(name, manifest, read, sdk):
             missing = missing_imports(contents)
             if missing:
                 raise ValueError(f'{folder}: missing imported DLLs: {sorted(missing)}')
+        check_early_crt_imports(farms['arm64ec-windows'])
 
 
 def read_regular(base, path):

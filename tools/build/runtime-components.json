@@ -44,6 +44,7 @@
       "app/Madeira/d3d12/**",
       "tools/build/build-runtime-component.sh",
       "tools/check-wine-media-dlls.py",
+      "tools/fork/check-farm-delayimports.py",
       "build/wineios-drv/**",
       "build/tftrace/*.c"
     ],

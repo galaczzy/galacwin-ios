@@ -82,3 +82,4 @@ fi
 LUAJIT_SRC="$LUA" bash "$R/build/luajit-x64/build.sh"
 
 python3 "$R/build/windows-runtime/targets.py" closure
+python3 "$R/tools/fork/check-farm-delayimports.py" "$R/app/Madeira/arm64ec-windows"
