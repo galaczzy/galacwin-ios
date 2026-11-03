@@ -17,11 +17,11 @@ jobs:
       - name: Verify reviewed rendering test sources
         run: |
           cat <<'HASHES' | shasum -a 256 -c -
-          834fa1a9283d133bc28342b8f59a75353af9341adb4eca46b724b3cd751f2901  madeira-d3d12/tests/windows/cube_window.c
-          142e802f0c1b1e5562a70d993212bea61902298c9d0a3d878f9bf40c18333391  madeira-d3d12/tests/windows/tri_dxil.h
-          9c37952da460fb4d611234f32fbe463c5ae680eef817bd8ad8788d1fcf67ee3c  madeira-d3d12/tests/windows/cube_geom.h
-          81c2980831c588659f5490450c8d34c92e637e43de8cdffa7b953878d496c54e  madeira-d3d12/tests/windows/root_sig.h
-          a6e1f5d198984a1f19574ab54fe8143a74527a0b0e98e9c6197e7d4fabeb429c  madeira-d3d12/tests/windows/checker_tex.h
+          63c64e034b816780c08d14a211d1ca6069689566f20c6dc79f0153d51036bd81  madeira-d3d12/tests/windows/cube_window.c
+          3204c6f7e17063b1cbef8edb7ba649cd6a51bddd9ab4f14382c48751bb2ac974  madeira-d3d12/tests/windows/tri_dxil.h
+          9ad4fc677f9d20c63acf857a97b68c4a9fd68ee3a885b5766d750db68cdf003a  madeira-d3d12/tests/windows/cube_geom.h
+          da3eb05339c1197a4abb1d6982ff21e3ef8268620159ceff2c5ea0c326343f41  madeira-d3d12/tests/windows/root_sig.h
+          31ac866d78e6b2b58099fd5a7ac0d75bf2f3bf8d7afe055864cbcf47d6f8ee69  madeira-d3d12/tests/windows/checker_tex.h
           HASHES
       - name: Download SHA-256-pinned compiler
         run: bash tools/build/setup-llvm-mingw.sh
