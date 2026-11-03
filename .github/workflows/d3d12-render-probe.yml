@@ -1,0 +1,59 @@
+name: Build isolated D3D12 render probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify reviewed rendering test sources
+        run: |
+          cat <<'HASHES' | shasum -a 256 -c -
+          834fa1a9283d133bc28342b8f59a75353af9341adb4eca46b724b3cd751f2901  madeira-d3d12/tests/windows/cube_window.c
+          142e802f0c1b1e5562a70d993212bea61902298c9d0a3d878f9bf40c18333391  madeira-d3d12/tests/windows/tri_dxil.h
+          9c37952da460fb4d611234f32fbe463c5ae680eef817bd8ad8788d1fcf67ee3c  madeira-d3d12/tests/windows/cube_geom.h
+          81c2980831c588659f5490450c8d34c92e637e43de8cdffa7b953878d496c54e  madeira-d3d12/tests/windows/root_sig.h
+          a6e1f5d198984a1f19574ab54fe8143a74527a0b0e98e9c6197e7d4fabeb429c  madeira-d3d12/tests/windows/checker_tex.h
+          HASHES
+      - name: Download SHA-256-pinned compiler
+        run: bash tools/build/setup-llvm-mingw.sh
+      - name: Build one x64 Windows executable
+        run: |
+          mkdir -p dist
+          toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/x86_64-w64-mingw32-clang \
+            -O2 -Wall -mwindows -Wl,--no-insert-timestamp \
+            -o dist/GalacWin-D3D12-render-probe.exe \
+            madeira-d3d12/tests/windows/cube_window.c \
+            -Imadeira-d3d12/tests/windows -luuid -lole32
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          data = Path('dist/GalacWin-D3D12-render-probe.exe').read_bytes()
+          assert data[:2] == b'MZ' and len(data) < 2_000_000
+          pe = struct.unpack_from('<I', data, 0x3c)[0]
+          assert data[pe:pe + 4] == b'PE\0\0'
+          assert struct.unpack_from('<H', data, pe + 4)[0] == 0x8664
+          print('PASS: bounded x86-64 Windows PE')
+          PY
+          shasum -a 256 dist/GalacWin-D3D12-render-probe.exe
+      - name: Encrypt the probe for local inspection
+        run: |
+          brew install age
+          age -R .github/ipa-audit-recipient.txt \
+            -o dist/GalacWin-D3D12-render-probe.exe.age \
+            dist/GalacWin-D3D12-render-probe.exe
+          shasum -a 256 dist/GalacWin-D3D12-render-probe.exe.age
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GalacWin-D3D12-render-probe-encrypted
+          path: dist/GalacWin-D3D12-render-probe.exe.age
+          if-no-files-found: error
+          retention-days: 7
