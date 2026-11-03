@@ -17,7 +17,7 @@ jobs:
       - name: Verify reviewed rendering test sources
         run: |
           cat <<'HASHES' | shasum -a 256 -c -
-          63c64e034b816780c08d14a211d1ca6069689566f20c6dc79f0153d51036bd81  madeira-d3d12/tests/windows/cube_window.c
+          f6c9d8bd9b41adf10b3bb100f541c302ef44c624c54ebf49dd4202e87de1549e  madeira-d3d12/tests/windows/cube_window.c
           3204c6f7e17063b1cbef8edb7ba649cd6a51bddd9ab4f14382c48751bb2ac974  madeira-d3d12/tests/windows/tri_dxil.h
           9ad4fc677f9d20c63acf857a97b68c4a9fd68ee3a885b5766d750db68cdf003a  madeira-d3d12/tests/windows/cube_geom.h
           da3eb05339c1197a4abb1d6982ff21e3ef8268620159ceff2c5ea0c326343f41  madeira-d3d12/tests/windows/root_sig.h
@@ -30,30 +30,30 @@ jobs:
           mkdir -p dist
           toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/x86_64-w64-mingw32-clang \
             -O2 -Wall -mwindows -Wl,--no-insert-timestamp \
-            -o dist/GalacWin-D3D12-render-probe.exe \
+            -o dist/GalacWin-D3D12-render-probe-fixed.exe \
             madeira-d3d12/tests/windows/cube_window.c \
             -Imadeira-d3d12/tests/windows -luuid -lole32
           python3 - <<'PY'
           from pathlib import Path
           import struct
-          data = Path('dist/GalacWin-D3D12-render-probe.exe').read_bytes()
+          data = Path('dist/GalacWin-D3D12-render-probe-fixed.exe').read_bytes()
           assert data[:2] == b'MZ' and len(data) < 2_000_000
           pe = struct.unpack_from('<I', data, 0x3c)[0]
           assert data[pe:pe + 4] == b'PE\0\0'
           assert struct.unpack_from('<H', data, pe + 4)[0] == 0x8664
           print('PASS: bounded x86-64 Windows PE')
           PY
-          shasum -a 256 dist/GalacWin-D3D12-render-probe.exe
+          shasum -a 256 dist/GalacWin-D3D12-render-probe-fixed.exe
       - name: Encrypt the probe for local inspection
         run: |
           brew install age
           age -R .github/ipa-audit-recipient.txt \
-            -o dist/GalacWin-D3D12-render-probe.exe.age \
-            dist/GalacWin-D3D12-render-probe.exe
-          shasum -a 256 dist/GalacWin-D3D12-render-probe.exe.age
+            -o dist/GalacWin-D3D12-render-probe-fixed.exe.age \
+            dist/GalacWin-D3D12-render-probe-fixed.exe
+          shasum -a 256 dist/GalacWin-D3D12-render-probe-fixed.exe.age
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: GalacWin-D3D12-render-probe-encrypted
-          path: dist/GalacWin-D3D12-render-probe.exe.age
+          name: GalacWin-D3D12-render-probe-fixed-encrypted
+          path: dist/GalacWin-D3D12-render-probe-fixed.exe.age
           if-no-files-found: error
           retention-days: 7
