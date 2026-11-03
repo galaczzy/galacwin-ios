@@ -1,5 +1,24 @@
 # Estado de seguridad de esta versión
 
+El [IPA de auditoría v7](https://github.com/galaczzy/galacwin-ios/actions/runs/41549536404)
+del commit `b53c724645c782f95ecea23e3e59faff320f82a7` bloquea la activación
+del transporte Metal remoto que enviaba un token por TCP sin cifrar. Lo hace
+tanto para la opción antigua `remote` como para los valores `env.*` globales y
+por juego; esos campos tampoco se ofrecen en el catálogo de ajustes. La
+pantalla de ajustes ya no copia los valores de configuración al registro. La
+compilación y la comprobación de las rutas bloqueadas pasaron en Actions. El
+SHA-256 local del IPA, `409197bba963c6d18ce6f75057621b1181c4eb8701656cba45f8ae5921c4fad6`,
+coincidió con el que registró el runner antes del cifrado. El verificador
+independiente aprobó sus 1 432 entradas, incluidos los hashes de 577 archivos
+del runtime. ClamAV 1.5.4 examinó 1,11 GiB sin detecciones de malware conocido
+en la pasada sin PUA. La pasada con PUA señaló únicamente
+`PUA.Win.Packer.Embedpe-3`; el `kernel32.dll` ARM64EC extraído del IPA activa
+esa misma firma y conserva el SHA-256 de v5 y v6. El informe local
+`outputs/informe-validacion-GalacWin-v7.md` contiene los registros y límites.
+**v7 aún no se ha instalado ni probado en el iPad; v5 sigue siendo la versión
+probada físicamente.** Ninguna de estas comprobaciones permite garantizar
+ausencia absoluta de malware.
+
 El IPA de auditoría v6 del commit
 [`4b5a202`](https://github.com/galaczzy/galacwin-ios/commit/4b5a202fa0efe6f01903965481fbee5083661fa5),
 todavía sin instalar, limita a 1 MiB la
@@ -227,9 +246,9 @@ auditoría.
    actualización fallida no trunque un archivo existente. Esto no sustituye
    la autenticidad criptográfica del manifiesto.
 5. Cifrar y autenticar el transporte de Metal remoto en `dxmt` y en su
-   prototipo antes de exponerlo en una red; el lanzador de prueba ahora usa
-   loopback por defecto, pero el cliente de la app aún usa TCP sin cifrar
-   cuando se configura `remote`.
+   prototipo antes de exponerlo en una red. Desde v7, las rutas de configuración
+   de la app bloquean su activación, pero el código del cliente permanece en
+   la dependencia compilada y el protocolo subyacente sigue sin cifrar.
 6. Obtener, si se desea, confirmación del proveedor sobre la alerta PUA de
    ClamAV y ampliar las pruebas en el iPad con datos de prueba antes de
    introducir cuentas personales. La instalación, la apertura sin Wi-Fi y la
