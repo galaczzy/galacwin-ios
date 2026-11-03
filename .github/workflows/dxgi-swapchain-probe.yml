@@ -1,0 +1,54 @@
+name: Build isolated DXGI swapchain probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify reviewed source
+        run: |
+          printf '%s  %s\n' \
+            be6bf96f4fdca82fed782ee51cb6cd4a6d00b35c8aff0e15e74915013ec77e66 \
+            tests/windows/galacwin-dxgi-swapchain-probe.c | shasum -a 256 -c -
+      - name: Download SHA-256-pinned compiler
+        run: bash tools/build/setup-llvm-mingw.sh
+      - name: Build one x64 Windows executable
+        run: |
+          mkdir -p dist
+          toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/x86_64-w64-mingw32-clang \
+            -O2 -Wall -Wextra -Werror -mwindows -Wl,--no-insert-timestamp \
+            -o dist/GalacWin-DXGI-swapchain-probe.exe \
+            tests/windows/galacwin-dxgi-swapchain-probe.c -luuid -luser32
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          data = Path('dist/GalacWin-DXGI-swapchain-probe.exe').read_bytes()
+          assert data[:2] == b'MZ' and len(data) < 2_000_000
+          pe = struct.unpack_from('<I', data, 0x3c)[0]
+          assert data[pe:pe + 4] == b'PE\0\0'
+          assert struct.unpack_from('<H', data, pe + 4)[0] == 0x8664
+          print('PASS: bounded x86-64 Windows PE')
+          PY
+          shasum -a 256 dist/GalacWin-DXGI-swapchain-probe.exe
+      - name: Encrypt the probe for local inspection
+        run: |
+          brew install age
+          age -R .github/ipa-audit-recipient.txt \
+            -o dist/GalacWin-DXGI-swapchain-probe.exe.age \
+            dist/GalacWin-DXGI-swapchain-probe.exe
+          shasum -a 256 dist/GalacWin-DXGI-swapchain-probe.exe.age
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: GalacWin-DXGI-swapchain-probe-encrypted
+          path: dist/GalacWin-DXGI-swapchain-probe.exe.age
+          if-no-files-found: error
+          retention-days: 7
