@@ -15,9 +15,13 @@ en la pasada sin PUA. La pasada con PUA señaló únicamente
 `PUA.Win.Packer.Embedpe-3`; el `kernel32.dll` ARM64EC extraído del IPA activa
 esa misma firma y conserva el SHA-256 de v5 y v6. El informe local
 `outputs/informe-validacion-GalacWin-v7.md` contiene los registros y límites.
-**v7 aún no se ha instalado ni probado en el iPad; v5 sigue siendo la versión
-probada físicamente.** Ninguna de estas comprobaciones permite garantizar
-ausencia absoluta de malware.
+El usuario informó que instaló v7 con Sideloadly y, en una sesión, abrió la
+biblioteca sin Wi-Fi, conectó LocalDevVPN, comprobó el emparejamiento y la
+preparación JIT, adjuntó JIT, obtuvo el resultado 42 en la prueba de ejecución
+y abrió Desktop y Notepad, que respondieron. Esta prueba funcional confirma
+esas rutas según lo observado por el usuario; no inspecciona el IPA vuelto a
+firmar ni comprueba juegos, cuentas personales o todas las rutas de ejecución.
+Ninguna de estas comprobaciones permite garantizar ausencia absoluta de malware.
 
 El IPA de auditoría v6 del commit
 [`4b5a202`](https://github.com/galaczzy/galacwin-ios/commit/4b5a202fa0efe6f01903965481fbee5083661fa5),
@@ -38,7 +42,8 @@ sin PUA terminó `OK` y la pasada PUA señaló sólo la firma ya conocida del
 `outputs/informe-validacion-GalacWin-v6.md`, fuera del repositorio público,
 contiene los hashes, registros y límites. El comportamiento de v6 en el iPad
 aún no se ha probado.
-El IPA v5 instalado sigue siendo el resultado probado más reciente.
+En ese momento, v5 era el resultado probado más reciente; la prueba de v7 se
+registra arriba.
 
 Esta es una derivación local de Madeira, fijada inicialmente al commit
 `c2c1b03a9e36ef986c980b9eae3c14d05a372db1`. Conserva su licencia y
