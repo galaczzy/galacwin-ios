@@ -106,7 +106,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command_line, i
                                             (void **)&heap);
     if (FAILED(hr) || !heap) return fail("CreateDescriptorHeap", hr);
     D3D12_CPU_DESCRIPTOR_HANDLE rtv;
-    ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap, &rtv);
+    heap->lpVtbl->GetCPUDescriptorHandleForHeapStart(heap, &rtv);
     ID3D12Device_CreateRenderTargetView(device, back, NULL, rtv);
 
     ID3D12CommandAllocator *allocator = NULL;

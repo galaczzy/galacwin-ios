@@ -17,7 +17,7 @@ jobs:
       - name: Verify reviewed source
         run: |
           printf '%s  %s\n' \
-            be6bf96f4fdca82fed782ee51cb6cd4a6d00b35c8aff0e15e74915013ec77e66 \
+            32e834cbd963df7e986ecbb4659f555ad56e195b6eb65eeaae1a19b965595c89 \
             tests/windows/galacwin-dxgi-swapchain-probe.c | shasum -a 256 -c -
       - name: Download SHA-256-pinned compiler
         run: bash tools/build/setup-llvm-mingw.sh
