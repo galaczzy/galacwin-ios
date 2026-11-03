@@ -696,6 +696,12 @@ func packageBuffer(apps: [UInt32], depots: [UInt32]) -> Data {
 
 @MainActor func units(_ fx: [String: Any]) async throws {
     // ---- protobuf: hostile input throws instead of trapping
+    var oversizedTag = ProtobufDecoder(Data([0x80, 0x80, 0x80, 0x80, 0x80, 0x01]))
+    do { _ = try oversizedTag.readTag(); require(false, "an oversized field number is rejected") }
+    catch { require(error is SteamError, "an oversized field number is rejected") }
+    var zeroTag = ProtobufDecoder(Data([0x00]))
+    do { _ = try zeroTag.readTag(); require(false, "field zero is rejected") }
+    catch { require(error is SteamError, "field zero is rejected") }
     var big = ProtobufDecoder(Data([0x0a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01]))
     _ = try? big.readTag()
     do { _ = try big.readBytes(); require(false, "an oversized length is rejected") } catch { require(error is SteamError, "an oversized length is rejected") }
@@ -936,6 +942,32 @@ func packageBuffer(apps: [UInt32], depots: [UInt32]) -> Data {
     do { _ = try DepotManifest.parse(depotID: 9001, manifestGID: fixtureGID, data: Data(manifestBytes[8..<16]))
          require(false, "bare payload bytes are rejected") }
     catch { require(true, "bare payload bytes are rejected") }
+    func le32(_ value: UInt32) -> Data {
+        Data([UInt8(truncatingIfNeeded: value), UInt8(truncatingIfNeeded: value >> 8),
+              UInt8(truncatingIfNeeded: value >> 16), UInt8(truncatingIfNeeded: value >> 24)])
+    }
+    func section(_ magic: UInt32, _ body: Data) -> Data {
+        var framed = le32(magic)
+        framed.append(le32(UInt32(body.count)))
+        framed.append(body)
+        return framed
+    }
+    var emptyFile = ProtobufEncoder()
+    emptyFile.writeString(fieldNumber: 1, value: "empty.dat")
+    var manyFiles = ProtobufEncoder()
+    for _ in 0...DepotManifest.maxFileEntries {
+        manyFiles.writeBytes(fieldNumber: 1, value: emptyFile.data)
+    }
+    var identity = ProtobufEncoder()
+    identity.writeUInt32(fieldNumber: 1, value: 9001)
+    identity.writeUInt64(fieldNumber: 2, value: fixtureGID)
+    var oversizedManifest = section(0x71F617D0, manyFiles.data)
+    oversizedManifest.append(section(0x1F4812BE, identity.data))
+    oversizedManifest.append(section(0x1B81B817, Data()))
+    oversizedManifest.append(le32(0x32C415AB))
+    do { _ = try DepotManifest.parse(depotID: 9001, manifestGID: fixtureGID, data: oversizedManifest)
+         require(false, "too many empty files are rejected") }
+    catch { require(error is SteamError, "too many empty files are rejected") }
     let secureBase = URL(fileURLWithPath: fx["tmp"] as! String).appendingPathComponent("secure-test")
     let secure = try SecureInstallDirectory(root: secureBase, components: ["common", "Game"])
     let outside = secureBase.appendingPathComponent("outside.txt")

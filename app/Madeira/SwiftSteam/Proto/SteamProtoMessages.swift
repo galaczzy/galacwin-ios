@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Jfishin, 125hz
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
+// GalacWin security modifications by galaczzy, 2026; see LICENSE-GALACWIN-EXCEPTION.md.
 //
 // Derived from Jfishin's Madeira Steam client, used in Madeira with the
 // author's permission (see docs/STEAM_SIGNIN.md, "Provenance"). The protobuf
@@ -141,6 +142,9 @@ struct ProtobufDecoder {
         while offset < data.count {
             let byte = data[offset]
             offset += 1
+            if shift == 63 && byte > 1 {
+                throw SteamError.protobufError("Varint exceeds UInt64")
+            }
             result |= UInt64(byte & 0x7F) << shift
             if byte & 0x80 == 0 {
                 return result
@@ -160,7 +164,12 @@ struct ProtobufDecoder {
         guard let wireType = ProtoWireType(rawValue: wireTypeRaw) else {
             throw SteamError.protobufError("Unknown wire type: \(wireTypeRaw)")
         }
-        return (fieldNumber: UInt32(tag >> 3), wireType: wireType)
+        let rawFieldNumber = tag >> 3
+        guard rawFieldNumber > 0, rawFieldNumber <= 0x1FFF_FFFF,
+              let fieldNumber = UInt32(exactly: rawFieldNumber) else {
+            throw SteamError.protobufError("Invalid field number")
+        }
+        return (fieldNumber: fieldNumber, wireType: wireType)
     }
 
     /// A length prefix, checked against the bytes that remain. Lengths come

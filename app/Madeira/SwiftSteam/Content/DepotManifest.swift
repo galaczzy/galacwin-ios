@@ -18,6 +18,7 @@ struct DepotManifest {
     static let maxFileSize: UInt64 = 1 << 40       // 1 TiB
     static let maxDepotSize: UInt64 = 8 << 40      // 8 TiB
     static let maxChunkSize: UInt32 = 64 << 20     // 64 MiB
+    static let maxFileEntries = 20_000
     let depotID: UInt32
     let manifestGID: UInt64
     let creationTime: UInt32
@@ -150,6 +151,9 @@ struct DepotManifest {
                             throw SteamError.manifestFetchFailed("Manifest compressed size exceeds limit")
                         }
                         totalCompressed = nextCompressed
+                    }
+                    guard manifest.files.count < maxFileEntries else {
+                        throw SteamError.manifestFetchFailed("Manifest has too many file entries")
                     }
                     manifest.files.append(entry)
                 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Jfishin, 125hz
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
+// GalacWin security modifications by galaczzy, 2026; see LICENSE-GALACWIN-EXCEPTION.md.
 //
 // Derived from Jfishin's Madeira Steam client, used in Madeira with the
 // author's permission (see docs/STEAM_SIGNIN.md, "Provenance"). Adapted for
@@ -26,7 +27,6 @@ actor CMServerList {
 
     private var servers: [CMServer] = []
     private var lastFetched: Date?
-    private let cacheKey = "swiftsteam_cm_servers_websocket"
     private let staleInterval: TimeInterval = 3600
 
     // MARK: - Public API
@@ -75,7 +75,6 @@ actor CMServerList {
         }
         servers = freshServers
         lastFetched = Date()
-        cacheServerList()
     }
 
     // MARK: - Private
@@ -96,10 +95,6 @@ actor CMServerList {
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            if let cached = loadCachedServers(), !cached.isEmpty {
-                SteamLog.trace("CM directory unavailable, using cached servers")
-                return cached
-            }
             throw SteamError.connectionFailed("CM directory returned non-200 status")
         }
 
@@ -121,21 +116,5 @@ actor CMServerList {
 
         SteamLog.trace("Fetched \(servers.count) WebSocket CM servers")
         return servers
-    }
-
-    // MARK: - Caching
-
-    private func cacheServerList() {
-        if let data = try? JSONEncoder().encode(servers) {
-            UserDefaults.standard.set(data, forKey: cacheKey)
-        }
-    }
-
-    private func loadCachedServers() -> [CMServer]? {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey),
-              let cached = try? JSONDecoder().decode([CMServer].self, from: data) else {
-            return nil
-        }
-        return cached
     }
 }

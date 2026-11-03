@@ -59,6 +59,7 @@ final class DepotDownloader {
     private let maxConcurrentChunks = 8
     private let attemptsPerChunk = 5
     private let hostPoolSize = 6
+    private let maxInstallFileEntries = 40_000
 
     private nonisolated static let http: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -148,6 +149,23 @@ final class DepotDownloader {
         guard !plans.isEmpty else {
             if let refused = licenseSkipped.first { throw SteamError.depotKeyNotFound(refused) }
             throw SteamError.depotNotFound(app.appID)
+        }
+
+        // Check metadata cost before prepare creates any game files. File byte
+        // totals alone do not account for a depot full of zero-length entries.
+        var entryCount = 0
+        for plan in plans {
+            guard plan.manifest.files.count <= DepotManifest.maxFileEntries,
+                  entryCount <= maxInstallFileEntries - plan.manifest.files.count else {
+                throw SteamError.manifestFetchFailed("Install has too many file entries")
+            }
+            entryCount += plan.manifest.files.count
+        }
+        if let free = installURL.freeSpace, case let available = UInt64(free) {
+            let metadataReserve = UInt64(entryCount) * 16_384
+            if available < metadataReserve {
+                throw SteamError.insufficientDiskSpace(needed: metadataReserve, available: available)
+            }
         }
 
         // 2. Prepare files without trusting journals or resizing existing files.
