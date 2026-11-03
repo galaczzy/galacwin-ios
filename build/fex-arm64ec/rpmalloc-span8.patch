@@ -1,6 +1,21 @@
 diff --git a/External/rpmalloc/rpmalloc/rpmalloc.c b/External/rpmalloc/rpmalloc/rpmalloc.c
 --- a/External/rpmalloc/rpmalloc/rpmalloc.c
 +++ b/External/rpmalloc/rpmalloc/rpmalloc.c
+@@ -168,7 +168,13 @@
+ #define SMALL_GRANULARITY 16
+ 
+ #define SMALL_BLOCK_SIZE_LIMIT (4 * 1024)
+ #define MEDIUM_BLOCK_SIZE_LIMIT (256 * 1024)
+-#define LARGE_BLOCK_SIZE_LIMIT (8 * 1024 * 1024)
++#ifdef FEX_IOS_HOST
++/* The 8MB large page has a header, so its 8MB size class cannot hold a block.
++ * Send requests above the preceding 7MB class through the huge path. */
++#define LARGE_BLOCK_SIZE_LIMIT (7 * 1024 * 1024)
++#else
++#define LARGE_BLOCK_SIZE_LIMIT (8 * 1024 * 1024)
++#endif
+ 
+ #define SMALL_SIZE_CLASS_COUNT 73
 @@ -186,7 +186,10 @@
   * SPAN_SIZE note below). Large-class ceiling falls 64MB -> 16MB; blocks in
   * (16MB, 64MB] shift to the huge path, which maps them at exact size — a VA
@@ -29,3 +44,14 @@ diff --git a/External/rpmalloc/rpmalloc/rpmalloc.c b/External/rpmalloc/rpmalloc/
  #else
  #define SPAN_SIZE (256 * 1024 * 1024)
  #endif
+@@ -791,6 +800,10 @@
+ //! Get the size class from given size in bytes
+ static inline uint32_t
+ get_size_class(size_t size) {
++#ifdef FEX_IOS_HOST
++	if (size > LARGE_BLOCK_SIZE_LIMIT)
++		return SIZE_CLASS_COUNT;
++#endif
+ 	uintptr_t minblock_count = (size + (SMALL_GRANULARITY - 1)) / SMALL_GRANULARITY;
+ 	// For sizes up to 64 times the minimum granularity (i.e 1024 bytes) the size class is equal to number of such
+ 	// blocks
