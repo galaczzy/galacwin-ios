@@ -1,0 +1,31 @@
+diff --git a/External/rpmalloc/rpmalloc/rpmalloc.c b/External/rpmalloc/rpmalloc/rpmalloc.c
+--- a/External/rpmalloc/rpmalloc/rpmalloc.c
++++ b/External/rpmalloc/rpmalloc/rpmalloc.c
+@@ -186,7 +186,10 @@
+  * SPAN_SIZE note below). Large-class ceiling falls 64MB -> 16MB; blocks in
+  * (16MB, 64MB] shift to the huge path, which maps them at exact size — a VA
+  * IMPROVEMENT over carving them from a 64MB span. */
+-#define LARGE_PAGE_SIZE_SHIFT 24
++/* GalacWin SH2 experiment: an 8MB span requires an 8MB large-page ceiling.
++ * Larger allocations take rpmalloc's exact-size huge path. This is paired
++ * with SPAN_SIZE below; changing only one of them breaks the class layout. */
++#define LARGE_PAGE_SIZE_SHIFT 23
+ #else
+ #define LARGE_PAGE_SIZE_SHIFT 26
+ #endif
+@@ -214,8 +217,13 @@
+  * the per-thread span footprint 4x (~48MB worst case); with the ml389 VA diet and
+  * db 5392 exact-aligned maps this puts 74 threads at ~3.5GB. Exit-leak (12 heaps,
+  * ~2GB) is secondary and partially covered by the ml435 ThreadTerm hardening. */
+-static const char ios_span16_marker[] __attribute__((used)) = "rpmalloc-span16 rev=ml436";
+-#define SPAN_SIZE (16 * 1024 * 1024)
++/* GalacWin SH2 experiment: the 4GB FEX arena had 148 reserved 16MB spans
++ * with only 902MB committed among them, then lacked one aligned 16MB hole.
++ * Halve span size to test whether unused address range can be recovered.
++ * This changes allocation classes and needs a device regression run before
++ * it can be treated as a fix. */
++static const char ios_span8_marker[] __attribute__((used)) = "rpmalloc-span8 experiment=sh2";
++#define SPAN_SIZE (8 * 1024 * 1024)
+ #else
+ #define SPAN_SIZE (256 * 1024 * 1024)
+ #endif

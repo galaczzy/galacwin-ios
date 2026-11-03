@@ -57,6 +57,18 @@ for arch in arm64ec aarch64; do
         done
     fi
 done
+# Experimental SH2 VA diet. The FEX submodule stays pinned and clean in Git;
+# this checked patch is applied only to the build workspace. Both ARM64EC and
+# WOW64 must see the same rpmalloc class layout. A changed upstream file fails
+# closed instead of building an unreviewed allocator variant.
+FEX_SPAN_PATCH="$R/build/fex-arm64ec/rpmalloc-span8.patch"
+FEX_SPAN_SOURCE="$R/FEX/External/rpmalloc/rpmalloc/rpmalloc.c"
+if grep -q 'rpmalloc-span8 experiment=sh2' "$FEX_SPAN_SOURCE"; then
+    git -C "$R/FEX" apply --reverse --check "$FEX_SPAN_PATCH"
+else
+    git -C "$R/FEX" apply --check "$FEX_SPAN_PATCH"
+    git -C "$R/FEX" apply "$FEX_SPAN_PATCH"
+fi
 bash "$R/build/fex-arm64ec/build.sh"
 bash "$R/build/fex-wow64/build.sh"
 bash "$R/build/faultrep/build.sh"
