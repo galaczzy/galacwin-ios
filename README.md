@@ -55,8 +55,9 @@ Wine's server runs as a thread instead of a separate program.
 ## Requirements
 
 - An iPhone on **iOS 26 or later** is the upstream project's documented target.
-  GalacWin's compatibility with the owner's iPad Pro M5 on iPadOS 27 still
-  needs a device test.
+  The owner installed GalacWin v7 on an iPad Pro M5 with iPadOS 27 and reported
+  that the library, JIT self-test, Wine desktop and Notepad worked. Game
+  compatibility and use with personal accounts remain untested; see SECURITY.md.
 - **JIT**, which iOS only allows while a debugger is attached. Madeira can use
   [StikDebug](https://github.com/StikDebug/StikDebug) or its built-in StikJIT
   helper. On iOS 27 the built-in helper can pair the iPhone itself, without a
